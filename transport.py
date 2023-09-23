@@ -1,5 +1,14 @@
 import socket
 
+class SocketFactory():
+    @staticmethod
+    def new_socket(sock_type: str, addr: str):
+        if sock_type == 'client':
+            return ClientSocket(addr)
+        if sock_type == 'server':
+            return ServerSocket(addr)
+        raise ValueError("Invalid socket type")
+
 class GenericSocket(): 
     """Generic socket that handles shared python socket API functions"""
 
@@ -32,12 +41,15 @@ class GenericSocket():
 
     def close(self):
         """Close a socket"""
+        if self.closed:
+            raise ClosedSocketError()
         self.sock.close()
         self.closed = True
 
     def __del__(self):
         """ensure the socket is closed on garbage collection"""
-        self.close()
+        if not self.closed:
+            self.close()
 
 
 class ClientSocket(GenericSocket):
