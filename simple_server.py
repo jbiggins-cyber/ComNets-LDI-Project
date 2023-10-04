@@ -1,25 +1,27 @@
+from datetime import datetime
 import transport
+import protocol
 
 try:
     # make any number of connections until termination
     while True:
-        socket = transport.ServerSocket('localhost')
+        p = protocol.ServerProtocol('localhost')
 
         # exchange messages on this connection
         while True:
-            d = socket.receive()
+            d = p.receive()
             print("received <<" + d + ">>")
             if d == 'close' or d == "":
                 print("closing because of receipt <<"+d+">>")
-                # socket.send("FIN ACK")
-                socket.close()
+                p.finish()
                 break
             elif d == 'drop':
                 # drop this message
                 pass
+            # actual ack should be handled in the layers below, this is just the server response
             else:
-                socket.send('ACK MSG <<' + d + '>>')
+                p.send('<<' + d + '>> rec\'d at ' + str(datetime.now()))
         # todo handle timeout
 
 except KeyboardInterrupt:
-    socket.close()
+    p.finish()

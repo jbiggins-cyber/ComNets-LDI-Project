@@ -53,7 +53,8 @@ class GenericSocket():
 
     def __del__(self):
         """ensure the socket is closed on garbage collection"""
-        if not self.closed:
+        # check on openend ensures we actually had a connection in the first place
+        if self.opened and not self.closed:
             self.close()
 
 
@@ -64,7 +65,11 @@ class ClientSocket(GenericSocket):
         # self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         binding = (addr, self.DEFAULT_PORT)
-        self.sock.connect(binding)
+        try:
+            self.sock.connect(binding)
+        except ConnectionRefusedError:
+            print("Failed to start. Is the server running?")
+            exit(1)
         self.opened = True
 
 class ServerSocket(GenericSocket):
