@@ -1,35 +1,19 @@
-import protocol
-import transport
-
-# socket = transport.ClientSocket('localhost')
-
-
-
-# # client = Protocol('client')
-
-# # client.transport.send('hello')
-
-# # d = client.transport.receive()
-
-# # print(d)
-
-# socket.close()
-
+import messenger
 
 try:
-    p = protocol.ClientProtocol('localhost')
+    m = messenger.ClientMessenger('localhost')
 
     # exchange messages on this connection
     while True:
         data = input()
         if data == 'close':
-            p.finish()
+            m.finish()
         else:
-            p.send(data)
-        r = p.receive()
+            m.send(data)
+        r = m.receive()
 
     # todo handle timeout
-    p.finish()
+    m.finish()
 
 except KeyboardInterrupt:
-    p.finish()
+    m.finish()

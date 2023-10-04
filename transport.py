@@ -10,7 +10,13 @@ class SocketFactory():
         raise ValueError("Invalid socket type")
 
 class GenericSocket(): 
-    """Generic socket that handles shared python socket API functions"""
+    """Generic socket that handles shared python socket API functions. 
+    It presents a simplified API to the higher levels which our protocols can
+    be implmented on top of.
+    
+    Currently uses TCP for ease of use but once the custom protocol is working,
+    will switch to UDP.
+    """
 
     """Size of the default buffer to hold received data"""
     DEFAULT_PORT = 3000

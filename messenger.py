@@ -1,6 +1,8 @@
 from transport import *
 
-class Protocol():
+class Messenger():
+    """The Messenger class manages communication using a custom designed protocol"""
+
     def __init__(self, sock_type: str, ip: str):
         self.ip = ip
         # We hold the transport class so it can be used at any time to get a new socket of the right type
@@ -11,27 +13,35 @@ class Protocol():
 
     def send(self, data: str):
         """Format this data with our own RDP protocol, then send over the lower-level base"""
-        send_buffer = "HEADER\n"+data+"\nFOOTER"
+        send_buffer = "HEADER D1 D2 D3\n"+data
         self.transport.send(send_buffer)
 
     def receive(self):
         """Parse out the RDP protocol and just return our data"""
         recv_buffer = self.transport.receive()
-        print("}}}" + recv_buffer + "{{{")
-        # for now just remove HEADER and FOOTER
-        return recv_buffer[len("HEADER\n"):-len("\nFOOTER")]
+        
+        # in the first draft, header will be separated from data by a newline
+        header_end = recv_buffer.index('\n')
+        header = recv_buffer[:header_end]
+        data = recv_buffer[header_end+1:]
+
+        print("Received Messenger comms:\n" + "\tHeader: " + header + "\n\tData: " + data + "\n------")
+        return data
 
     def _send_chunk(self, next_chunk):
         self.transport.send(next_chunk)
         return self.transport.receive()
 
+    def finish(self):
+        self.send("FINMSG")
+        self.transport.close()
 
-class ClientProtocol(Protocol):
+class ClientMessenger(Messenger):
     def __init__(self, ip: str):
         super().__init__('client', ip)
         self.get_new_sock()
 
-class ServerProtocol(Protocol):
+class ServerMessenger(Messenger):
     def __init__(self, ip:str):
         super().__init__('server', ip)
         self.get_new_sock()
