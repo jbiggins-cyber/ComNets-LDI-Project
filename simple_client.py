@@ -1,4 +1,4 @@
-from protocol import Protocol
+import protocol
 import transport
 
 # socket = transport.ClientSocket('localhost')
@@ -17,15 +17,19 @@ import transport
 
 
 try:
-    socket = transport.ClientSocket('localhost')
+    p = protocol.ClientProtocol('localhost')
 
     # exchange messages on this connection
     while True:
-        socket.send(input())
-        r = socket.receive()
+        data = input()
+        if data == 'close':
+            p.finish()
+        else:
+            p.send(data)
+        r = p.receive()
 
     # todo handle timeout
-    socket.close()
+    p.finish()
 
 except KeyboardInterrupt:
-    socket.close()
+    p.finish()
