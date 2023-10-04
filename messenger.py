@@ -21,9 +21,14 @@ class Messenger():
         recv_buffer = self.transport.receive()
         
         # in the first draft, header will be separated from data by a newline
-        header_end = recv_buffer.index('\n')
-        header = recv_buffer[:header_end]
-        data = recv_buffer[header_end+1:]
+        # there should be a better way to do this
+        try:
+            header_end = recv_buffer.index('\n')
+            header = recv_buffer[:header_end]
+            data = recv_buffer[header_end+1:]
+        except ValueError:
+            header = recv_buffer
+            data = ""
 
         print("Received Messenger comms:\n" + "\tHeader: " + header + "\n\tData: " + data + "\n------")
         return data
@@ -46,4 +51,8 @@ class ServerMessenger(Messenger):
         super().__init__('server', ip)
         self.get_new_sock()
 
-    
+class Protocol():
+    def __init__(self):
+        pass
+    def add_header(self, data):
+        return "HEADER\n" + data
