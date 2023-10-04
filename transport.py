@@ -17,11 +17,13 @@ class GenericSocket():
     BUFFLEN = 1024
 
     def __init__(self):
-        self._create_socket()
+        self.opened = False # set in the child init!
         self.closed = False
+        self._create_socket()
 
     def _create_socket(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.settimeout(1)
 
     def send(self, data: str):
         """Datastring to send along the connection"""
@@ -41,9 +43,12 @@ class GenericSocket():
 
     def close(self):
         """Close a socket"""
+        if not self.opened:
+            raise SocketNotOpenedError()
         if self.closed:
             raise ClosedSocketError()
         self.sock.close()
+        print('closing socket')
         self.closed = True
 
     def __del__(self):
@@ -60,17 +65,36 @@ class ClientSocket(GenericSocket):
 
         binding = (addr, self.DEFAULT_PORT)
         self.sock.connect(binding)
+        self.opened = True
 
 class ServerSocket(GenericSocket):
     """Server socket to deal with server-specific socket creation"""
     def __init__(self, addr: str):
         super().__init__()
-        # self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         binding = (addr, self.DEFAULT_PORT)
+        # allow the address to be reused when the next socket is created
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(binding)
         self.sock.listen()
-        self.sock, addr = self.sock.accept()
+
+        # block until a connection arrives, then unblock
+        while True:
+            try:
+                conn, info = self.sock.accept()
+            except socket.timeout:
+                pass
+            except:
+                raise
+            else:
+                self.sock = conn
+                print("new connection on", info)
+                self.opened = True
+                return
 
 class ClosedSocketError(Exception):
     """Raised when a user tries to send/receive on an already closed socket"""
+    pass
+
+class SocketNotOpenedError(Exception):
+    """Raised when a user tries to close a socket that hasn't been opened"""
     pass
