@@ -2,11 +2,11 @@ import socket
 
 class SocketFactory():
     @staticmethod
-    def new_socket(sock_type: str, addr: str):
+    def new_socket(sock_type: str):
         if sock_type == 'client':
-            return ClientSocket(addr)
+            return ClientSocket
         if sock_type == 'server':
-            return ServerSocket(addr)
+            return ServerSocket
         raise ValueError("Invalid socket type")
 
 class GenericSocket(): 
