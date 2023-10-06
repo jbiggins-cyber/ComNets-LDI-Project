@@ -1,3 +1,5 @@
+import select
+
 from transport import *
 from rdt_protocol import *
 
@@ -24,6 +26,7 @@ class Messenger():
     N_SEQ_DIGITS = 4
     N_CHECKSUM_CHARS = 7
     PACKET_DATA_LEN = 20 # bytes -- todo change
+    RECV_TIMEOUT = 2 # seconds
 
     def __init__(self, sock_type: str, ip: str):
         self.ip = ip
@@ -45,12 +48,34 @@ class Messenger():
 
     def receive(self):
         """Parse out the RDP protocol and just return our data"""
-        recv_buffer = self.transport.receive()
-        
-        header, data = self.__get_header_data_split(recv_buffer)
+        received_data_buffer = ""
 
-        print("Received Messenger comms:\n" + "\tHeader: " + header + "\n\tData: " + data + "\n------")
-        return data
+        have_received_data = False
+        while more_data := select.select([self.transport.sock], [], [], self.RECV_TIMEOUT):
+            # this check sees if there's any more data to be read on the socket
+            # if we have read previously in this loop, then we're within the receipt state machine, and no data means we're done
+            # if we've never read anything, then we are a server pending on a new receipt from the client, and so we just keep looping
+            if not more_data[0]:
+                # print('nothing to receive')
+                if have_received_data:
+                    return received_data_buffer
+                else:
+                    continue
+            
+            # getting here mean we've received data
+            # print('more to receive')
+            have_received_data = True
+
+            recv_buffer = self.transport.receive()
+            header_params, data = self._extract(recv_buffer)
+
+            # the python socket API is combining the data we received into a single buffer!
+            print('\033[31m', header_params)
+            print('\033[32m [[', data, ']]\033[0m')
+
+            print("Received Messenger comms:\n" + "\tHeader: " + str(header_params) + "\n\tData: " + data + "\n------")
+
+            received_data_buffer += data
 
     def finish(self):
         self.send("FINMSG")
@@ -66,6 +91,7 @@ class Messenger():
         packet_list = []
         seq = 0
         while len(data[data_idx:]) > self.PACKET_DATA_LEN:
+            # insert checksum here!
             header_params = {"seq": seq, "flags": 0x00, "check": "abcdefg"}
             header = self._create_header(header_params)
             next_packet = header + '\n' + data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
@@ -99,7 +125,7 @@ class Messenger():
         flags = int(header[i+len('F:'):i+self.N_FLAG_HEXS+len('F:')])
 
         i = header.index('C:')
-        checksum = int(header[i+len('F:'):i+self.N_CHECKSUM_CHARS+len('F:')])
+        checksum = header[i+len('C:'):i+self.N_CHECKSUM_CHARS+len('C:')]
 
         return {"seq": seq_num, "flags": flags, "check": checksum}
 
