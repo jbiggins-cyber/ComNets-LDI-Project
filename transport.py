@@ -40,8 +40,9 @@ class GenericSocket():
     def receive(self) -> str:
         """Wait for data to be received on the connection.
         If no data is received, the connection is closed"""
-        if self.closed:
-            raise ClosedSocketError()
+        # you can receive on a closed socket! -- Maybe have a TX closed and RX closed option?
+        # if self.closed:
+            # raise ClosedSocketError()
         data = self.sock.recv(self.BUFFLEN)
         if not data:
             self.close()

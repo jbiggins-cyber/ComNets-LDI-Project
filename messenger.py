@@ -1,5 +1,11 @@
 from transport import *
 
+# I think this needs to be changed somewhat
+# once send is called, the whole Messenger API should block until the correct ACKs (or whatever the protocol dictates) have been received
+# when receive is called, the API should block until we confirm that we have received the whole chunk desired.
+#   Unsure how to have this call pend til then? Maybe the whole lower level will allow us to pend?
+
+
 class Messenger():
     """The Messenger class manages communication using a custom designed protocol"""
 
@@ -8,7 +14,7 @@ class Messenger():
         # We hold the transport class so it can be used at any time to get a new socket of the right type
         self.__transport_class = SocketFactory.new_socket(sock_type)
 
-    def get_new_sock(self):
+    def _get_new_sock(self):
         self.transport = self.__transport_class(self.ip)
 
     def send(self, data: str):
@@ -33,10 +39,6 @@ class Messenger():
         print("Received Messenger comms:\n" + "\tHeader: " + header + "\n\tData: " + data + "\n------")
         return data
 
-    def _send_chunk(self, next_chunk):
-        self.transport.send(next_chunk)
-        return self.transport.receive()
-
     def finish(self):
         self.send("FINMSG")
         self.transport.close()
@@ -44,12 +46,12 @@ class Messenger():
 class ClientMessenger(Messenger):
     def __init__(self, ip: str):
         super().__init__('client', ip)
-        self.get_new_sock()
+        self._get_new_sock()
 
 class ServerMessenger(Messenger):
     def __init__(self, ip:str):
         super().__init__('server', ip)
-        self.get_new_sock()
+        self._get_new_sock()
 
 
 
@@ -64,6 +66,7 @@ class Protocol():
     FLAGS = {"ACK": 0x01, "FIN": 0x02, "NACK": 0x04}
     N_FLAG_HEXS  = 2
     N_SEQ_DIGITS = 4
+    PACKET_DATA_LEN = 100 # bytes -- todo change
 
     def __init__(self):
         self.seq = 0
@@ -72,9 +75,9 @@ class Protocol():
     def enqueue_packets(self, flags: int, data: str):
         """Split up a message by size and append the required headers"""
         data_idx = 0
-        while len(data[data_idx:]) > PACKET_LEN:
+        while len(data[data_idx:]) > self.PACKET_DATA_LEN:
             header_params = {"seq": self.seq, "flags": 0x00}
-            next_packet = self.__create_header(header_params) + "\n" + data[data_idx:data_idx+self.PACKET_LEN]
+            next_packet = self.__create_header(header_params) + "\n" + data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
             self.send_buffer.append(next_packet)
             
     def parse_packet(self, packet: str) -> tuple[dict[str, any], str]:
