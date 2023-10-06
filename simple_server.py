@@ -10,7 +10,7 @@ try:
         while True:
             d = m.receive()
             print("received <<" + d + ">>")
-            if d == 'close' or d == "":
+            if d == "FINMSG" or d == "":
                 print("closing because of receipt <<"+d+">>")
                 m.finish()
                 break

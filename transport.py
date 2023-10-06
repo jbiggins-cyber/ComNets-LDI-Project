@@ -56,6 +56,7 @@ class GenericSocket():
         self.sock.close()
         print('closing socket')
         self.closed = True
+        exit()
 
     def __del__(self):
         """ensure the socket is closed on garbage collection"""

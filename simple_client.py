@@ -10,7 +10,7 @@ try:
             m.finish()
         else:
             m.send(data)
-        r = m.receive()
+            r = m.receive()
 
     # todo handle timeout
     m.finish()
