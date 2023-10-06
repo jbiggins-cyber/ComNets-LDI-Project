@@ -23,7 +23,7 @@ class Messenger():
     N_FLAG_HEXS  = 2
     N_SEQ_DIGITS = 4
     N_CHECKSUM_CHARS = 7
-    PACKET_DATA_LEN = 100 # bytes -- todo change
+    PACKET_DATA_LEN = 20 # bytes -- todo change
 
     def __init__(self, sock_type: str, ip: str):
         self.ip = ip
@@ -36,10 +36,12 @@ class Messenger():
     def send(self, data: str):
         """Format this data with our own RDP protocol, then send over the lower-level base"""
 
-        # send_buffer = self._split_data_into_packets(data)
+        packets_to_send = self._split_data_into_packets(data)
 
-        send_buffer = "HEADER D1 D2 D3\n"+data
-        self.transport.send(send_buffer)
+        print("will send:", packets_to_send)
+
+        for packet in packets_to_send:
+            self.transport.send(packet)
 
     def receive(self):
         """Parse out the RDP protocol and just return our data"""
@@ -64,15 +66,16 @@ class Messenger():
         packet_list = []
         seq = 0
         while len(data[data_idx:]) > self.PACKET_DATA_LEN:
-            header_params = {"seq": seq, "flags": 0x00, "Check": 0}
+            header_params = {"seq": seq, "flags": 0x00, "check": "abcdefg"}
             header = self._create_header(header_params)
-            next_packet = data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
+            next_packet = header + '\n' + data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
             packet_list.append(next_packet)
+            data_idx += self.PACKET_DATA_LEN
             seq += 1
         # todo fix indexing so we don't need to do again once the while loop finishes
-        header_params = {"seq": seq, "flags": 0x00, "Check": 0}
+        header_params = {"seq": seq, "flags": 0x00, "check": "abcdefg"}
         header = self._create_header(header_params)
-        next_packet = data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
+        next_packet = header + '\n' + data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
         packet_list.append(next_packet)
         return packet_list
 
@@ -106,18 +109,19 @@ class Messenger():
         Create the procotol header for given params
         Current params: `seq`, `flags`, `check`
         """
+        print(params)
         if not 'seq' in params:
             raise ValueError("Missing sequence number (key: 'seq')")
         if not (0 <= params["seq"] <= 9999):
-            raise ValueError(f"Seq num out of range: {seq}")
+            raise ValueError(f"Seq num out of range: {params['seq']}")
         if not 'flags' in params:
             raise ValueError("Missing flags (key: 'flags')")
         if not (0x00 <= params["flags"] <= 0xFF):
-            raise ValueError(f"Flags out of range: {flags}")
+            raise ValueError(f"Flags out of range: {params['flags']}")
         if not 'check' in params:
             raise ValueError("Missing checksum (key: 'check')")
         # todo figure out checksum length! 7 is default git short length
-        return f"HEADER S:{params['seq']:04d} F:{params['flags']:02x} C:{params['check'][0:N_CHECKSUM_CHARS]}"
+        return f"HEADER S:{params['seq']:04d} F:{params['flags']:02x} C:{params['check'][0:self.N_CHECKSUM_CHARS]}"
 
     def __get_header_data_split(self, buffer: str) -> tuple[str, str]:
         """Split a received buffer into header and data components"""
