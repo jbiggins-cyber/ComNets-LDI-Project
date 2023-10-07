@@ -37,7 +37,6 @@ class GenericSocket():
         self.closed = False
         self.sock = socket.socket(socket.AF_INET, sock_type)
         self.binding = (addr, self.DEFAULT_PORT)
-        self.sock.settimeout(1)
 
     def send(self, data: str):
         raise NotImplementedError()
@@ -67,6 +66,7 @@ class TCPSocket(GenericSocket):
     """Parent class of the TCP Socket connections. Uses the SOCK_STREAM send and receive API"""
     def __init__(self, addr: str):
         super().__init__(addr, socket.SOCK_STREAM)
+        self.sock.settimeout(1)
     
     def send(self, data: str):
         if self.closed:

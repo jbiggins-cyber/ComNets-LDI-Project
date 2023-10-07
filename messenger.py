@@ -1,4 +1,6 @@
 import select
+import time
+from math import ceil
 
 from transport import *
 from rdt_protocol import *
@@ -49,34 +51,41 @@ class Messenger():
 
     def receive(self):
         """Parse out the RDP protocol and just return our data"""
-        received_data_buffer = ""
+        received_data_buffer = []
 
         have_received_data = False
-        while more_data := select.select([self.transport.sock], [], [], self.RECV_TIMEOUT):
+        start_time = time.time()
+        while True:
+            time.sleep(1)
+            remaining_timeout = self.RECV_TIMEOUT - (time.time() - start_time)
+            
+            more_data = select.select([self.transport.sock], [], [], self.RECV_TIMEOUT)
             # this check sees if there's any more data to be read on the socket
             # if we have read previously in this loop, then we're within the receipt state machine, and no data means we're done
             # if we've never read anything, then we are a server pending on a new receipt from the client, and so we just keep looping
-            if not more_data[0]:
-                # print('nothing to receive')
-                if have_received_data:
-                    return received_data_buffer
-                else:
-                    continue
-            
-            # getting here mean we've received data
-            # print('more to receive')
-            have_received_data = True
+            print(more_data)
 
-            recv_buffer = self.transport.receive()
-            header_params, data = self._extract(recv_buffer)
+            if more_data[0] or remaining_timeout > 0:
 
-            # the python socket API is combining the data we received into a single buffer!
-            print('MSG: RCV: header:\033[31m', header_params, '\033[0m')
-            print('MSG: RCV: data:\033[32m [[', data, ']]\033[0m')
+                # getting here mean we've received data
+                # print('more to receive')
+                have_received_data = True
 
-            print("MSG: RCV: Received Messenger comms:\n" + "\tHeader: " + str(header_params) + "\n\tData: " + data + "\n------")
+                recv_buffer = self.transport.receive()
+                header_params, data = self._extract(recv_buffer)
 
-            received_data_buffer += data
+                # the python socket API is combining the data we received into a single buffer!
+                print('MSG: RCV: header:\033[31m', header_params, '\033[0m')
+                print('MSG: RCV: data:\033[32m [[', data, ']]\033[0m')
+
+                print("MSG: RCV: Received Messenger comms:\n" + "\tHeader: " + str(header_params) + "\n\tData: " + data + "\n------")
+
+                received_data_buffer.append((header_params, data))
+
+                # if we have the number of packets we need, stitch them together
+                if len(received_data_buffer) == received_data_buffer[0][0]["total"]:
+                    # sort the packets in order and join
+                    return ''.join([r[1] for r in sorted(received_data_buffer, key=lambda r:r[0]["seq"])])
 
     def finish(self):
         self.send("FINMSG")
@@ -87,23 +96,18 @@ class Messenger():
         Split up a message by size
         This does the make_pkt() functionality
         """
-
-        data_idx = 0
         packet_list = []
-        seq = 0
-        while len(data[data_idx:]) > self.PACKET_DATA_LEN:
+        n_packets = ceil(len(data) / self.PACKET_DATA_LEN)
+
+        for i in range(n_packets):
+            data_idx = i*self.PACKET_DATA_LEN
             # insert checksum here!
-            header_params = {"seq": seq, "flags": 0x00, "check": "abcdefg"}
+            # seq = i+1 means that seq of last packet == total
+            header_params = {"seq": i+1, "total": n_packets, "flags": 0x00, "check": "abcdefg"}
             header = self._create_header(header_params)
             next_packet = header + '\n' + data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
             packet_list.append(next_packet)
-            data_idx += self.PACKET_DATA_LEN
-            seq += 1
-        # todo fix indexing so we don't need to do again once the while loop finishes
-        header_params = {"seq": seq, "flags": 0x00, "check": "abcdefg"}
-        header = self._create_header(header_params)
-        next_packet = header + '\n' + data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
-        packet_list.append(next_packet)
+
         return packet_list
 
     def _extract(self, packet: str) -> tuple[dict[str, any], str]:
@@ -122,13 +126,16 @@ class Messenger():
         i = header.index('S:')
         seq_num = int(header[i+len('S:'):i+self.N_SEQ_DIGITS+len('S:')])
 
+        i = header.index('T:')
+        total = int(header[i+len('T:'):i+self.N_SEQ_DIGITS+len('T:')])
+
         i = header.index('F:')
         flags = int(header[i+len('F:'):i+self.N_FLAG_HEXS+len('F:')])
 
         i = header.index('C:')
         checksum = header[i+len('C:'):i+self.N_CHECKSUM_CHARS+len('C:')]
 
-        return {"seq": seq_num, "flags": flags, "check": checksum}
+        return {"seq": seq_num, "total": total, "flags": flags, "check": checksum}
 
     # OVERRIDE IN CHILD
     def _create_header(self, params: dict[str, any]) -> str:
@@ -141,6 +148,10 @@ class Messenger():
             raise ValueError("Missing sequence number (key: 'seq')")
         if not (0 <= params["seq"] <= 9999):
             raise ValueError(f"Seq num out of range: {params['seq']}")
+        if not 'total' in params:
+            raise ValueError("Missing sequence number (key: 'total')")
+        if not (0 <= params["total"] <= 9999):
+            raise ValueError(f"Seq num out of range: {params['total']}")
         if not 'flags' in params:
             raise ValueError("Missing flags (key: 'flags')")
         if not (0x00 <= params["flags"] <= 0xFF):
@@ -148,7 +159,7 @@ class Messenger():
         if not 'check' in params:
             raise ValueError("Missing checksum (key: 'check')")
         # todo figure out checksum length! 7 is default git short length
-        return f"HEADER S:{params['seq']:04d} F:{params['flags']:02x} C:{params['check'][0:self.N_CHECKSUM_CHARS]}"
+        return f"HEADER S:{params['seq']:04d} T:{params['total']:04d} F:{params['flags']:02x} C:{params['check'][0:self.N_CHECKSUM_CHARS]}"
 
     def __get_header_data_split(self, buffer: str) -> tuple[str, str]:
         """Split a received buffer into header and data components"""
