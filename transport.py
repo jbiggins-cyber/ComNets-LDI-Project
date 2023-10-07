@@ -128,7 +128,10 @@ class UDPSocket(GenericSocket):
     def send(self, data: str):
         self.sock.sendto(data.encode(), self.binding)
     def receive(self) -> str:
-        return self.sock.recvfrom(self.BUFFLEN)[0].decode()
+        received = self.sock.recvfrom(self.BUFFLEN)
+        # save the return address, means recipient will reply to initiator
+        self.binding = received[1]
+        return received[0].decode()
 
 class ClientUDPSocket(UDPSocket):
     """Client socket to deal with client-specific UDP socket creation"""
