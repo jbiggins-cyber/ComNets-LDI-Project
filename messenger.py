@@ -27,11 +27,12 @@ class Messenger():
     N_CHECKSUM_CHARS = 7
     PACKET_DATA_LEN = 20 # bytes -- todo change
     RECV_TIMEOUT = 2 # seconds
+    SOCKET_TYPE = 'udp'
 
     def __init__(self, sock_type: str, ip: str):
         self.ip = ip
         # We hold the transport class so it can be used at any time to get a new socket of the right type
-        self.__transport_class = SocketFactory.new_socket(sock_type)
+        self.__transport_class = SocketFactory.new_socket(sock_type, self.SOCKET_TYPE)
 
     def _get_new_sock(self):
         self.transport = self.__transport_class(self.ip)
@@ -41,7 +42,7 @@ class Messenger():
 
         packets_to_send = self._split_data_into_packets(data)
 
-        print("will send:", packets_to_send)
+        print("MSG: SEND: will send:", packets_to_send)
 
         for packet in packets_to_send:
             self.transport.send(packet)
@@ -70,10 +71,10 @@ class Messenger():
             header_params, data = self._extract(recv_buffer)
 
             # the python socket API is combining the data we received into a single buffer!
-            print('\033[31m', header_params)
-            print('\033[32m [[', data, ']]\033[0m')
+            print('MSG: RCV: header:\033[31m', header_params, '\033[0m')
+            print('MSG: RCV: data:\033[32m [[', data, ']]\033[0m')
 
-            print("Received Messenger comms:\n" + "\tHeader: " + str(header_params) + "\n\tData: " + data + "\n------")
+            print("MSG: RCV: Received Messenger comms:\n" + "\tHeader: " + str(header_params) + "\n\tData: " + data + "\n------")
 
             received_data_buffer += data
 
@@ -135,7 +136,7 @@ class Messenger():
         Create the procotol header for given params
         Current params: `seq`, `flags`, `check`
         """
-        print(params)
+        print("MSG: _create_header: params:",params)
         if not 'seq' in params:
             raise ValueError("Missing sequence number (key: 'seq')")
         if not (0 <= params["seq"] <= 9999):

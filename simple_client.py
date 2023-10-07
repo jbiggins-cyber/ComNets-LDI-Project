@@ -12,6 +12,8 @@ try:
             m.send(data)
             r = m.receive()
 
+            print("GOT: ", r)
+
     # todo handle timeout
     m.finish()
 
