@@ -3,7 +3,7 @@ import time
 from math import ceil
 
 from transport import *
-from rdt_protocol import *
+# from rdt_protocol import *
 
 # I think this needs to be changed somewhat
 # once send is called, the whole Messenger API should block until the correct ACKs (or whatever the protocol dictates) have been received
@@ -29,12 +29,12 @@ class Messenger():
     N_CHECKSUM_CHARS = 7
     PACKET_DATA_LEN = 20 # bytes -- todo change
     RECV_TIMEOUT = 2 # seconds
-    SOCKET_TYPE = 'udp'
 
-    def __init__(self, sock_type: str, ip: str):
+    def __init__(self, client_server: str, sock_type: str, ip: str):
+        self.sock_type = sock_type
         self.ip = ip
         # We hold the transport class so it can be used at any time to get a new socket of the right type
-        self.__transport_class = SocketFactory.new_socket(sock_type, self.SOCKET_TYPE)
+        self.__transport_class = SocketFactory.new_socket(client_server, sock_type)
 
     def _get_new_sock(self):
         self.transport = self.__transport_class(self.ip)
@@ -175,11 +175,11 @@ class Messenger():
 
 
 class ClientMessenger(Messenger):
-    def __init__(self, ip: str):
-        super().__init__('client', ip)
+    def __init__(self, sock_type: str, ip: str):
+        super().__init__('client', sock_type, ip)
         self._get_new_sock()
 
 class ServerMessenger(Messenger):
-    def __init__(self, ip:str):
-        super().__init__('server', ip)
+    def __init__(self, sock_type: str, ip: str):
+        super().__init__('server', sock_type, ip)
         self._get_new_sock()

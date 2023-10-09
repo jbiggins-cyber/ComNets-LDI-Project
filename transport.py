@@ -117,7 +117,7 @@ class ServerTCPSocket(TCPSocket):
                 raise
             else:
                 self.sock = conn
-                print("new connection on", info)
+                print("New connection on", info)
                 self.opened = True
                 return
 
