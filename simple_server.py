@@ -9,9 +9,9 @@ try:
         # exchange messages on this connection
         while True:
             d = m.receive()
-            print("received <<" + d + ">>")
+            print("SERVER: received <<" + d + ">>")
             if d == "FINMSG" or d == "":
-                print("closing because of receipt <<"+d+">>")
+                print("SERVER: closing because of receipt <<"+d+">>")
                 m.finish()
                 break
             elif d == 'drop':
