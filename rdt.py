@@ -1,6 +1,7 @@
 from math import ceil
 
-BYTE_SIZE = 8
+BYTE_SIZE =         8
+BASE2 =             2
 
 def str2Bin(message: str):
     # This function converts a string to a unicode list of bit characters.
@@ -16,21 +17,21 @@ def str2Bin(message: str):
 
     # Convert each unique unicode byte representing a character into binary
     for uniqueVal in unicodeMessage:
-        unicode = bin(uniqueVal)[2:]    # Ignores first two string elements '0b'
-        while len(unicode) % 8:         # Adds leading 0's to fill out bytes
+        unicode = bin(uniqueVal)[2:]            # Ignores first two string elements '0b'
+        while len(unicode) % BYTE_SIZE:         # Adds leading 0's to fill out bytes
             unicode = '0' + unicode
         for bit in unicode:
             binList.append(bit)
     return binList
 
 def bin2Str(message: list):
-    # This function converts a unicode list of bit characters back to a string.
+    # This function converts a unicode list of bit characters back to a message string.
     # The binary list could potentially be corrupted.
 
     byteList = bytearray()
     numBytes = ceil(len(message) / BYTE_SIZE)
     bitStr = ''.join(message)
-    value = int(bitStr, 2)
+    value = int(bitStr, BASE2)
     byteList = value.to_bytes(numBytes)
     messageStr = byteList.decode('utf-8')
         
@@ -39,6 +40,8 @@ def bin2Str(message: list):
 def bytes2Bin(payload: bytes):
     # This function converts the received payload from bytes into a unicode list of bit characters.
     # We need this function to verify a checksum.
+
+
 
     raise NotImplementedError()
 
