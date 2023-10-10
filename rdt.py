@@ -9,20 +9,10 @@ def str2Bin(message: str):
     # We need this function if we want to randomly corrupt the message,
     # or compute a checksum.
 
-    # Initialising
-    binList = []
-
-    # Converts string into bytes object
+    # Converts string into bytes object using utf-8 encoding
     unicodeMessage = message.encode('utf-8')
 
-    # Convert each unique unicode byte representing a character into binary
-    for uniqueVal in unicodeMessage:
-        unicode = bin(uniqueVal)[2:]            # Ignores first two string elements '0b'
-        while len(unicode) % BYTE_SIZE:         # Adds leading 0's to fill out bytes
-            unicode = '0' + unicode
-        for bit in unicode:
-            binList.append(bit)
-    return binList
+    return bytes2Bin(unicodeMessage)
 
 def bin2Str(message: list):
     # This function converts a unicode list of bit characters back to a message string.
@@ -41,13 +31,30 @@ def bytes2Bin(payload: bytes):
     # This function converts the received payload from bytes into a unicode list of bit characters.
     # We need this function to verify a checksum.
 
+    # Initialising
+    binList = []
 
+    # Convert each unique unicode representing a character into binary
+    for uniqueVal in payload:
+        unicode = bin(uniqueVal)[2:]            # Ignores first two string elements '0b'
+        while len(unicode) % BYTE_SIZE:         # Adds leading 0's to fill out bytes
+            unicode = '0' + unicode
+        for bit in unicode:
+            binList.append(bit)
+    return binList
 
-    raise NotImplementedError()
-
+print()
 message = "This is a tϧst message string!"
 print("Original message: {}".format(message))
 unicodeMessage = str2Bin(message)
 print("Message to binary: {}".format(''.join(unicodeMessage)))
 decodedMessage = bin2Str(unicodeMessage)
 print("Binary to string: {}".format(decodedMessage))
+
+print()
+byteArr = message.encode('utf-8')
+print("Original message to bytes: {}".format(byteArr))
+unicodeBytes = bytes2Bin(byteArr)
+print("Bytes to binary: {}".format(''.join(unicodeBytes)))
+decodedBytesMessage = bin2Str(unicodeBytes)
+print("Decoded bytes payload: {}".format(decodedBytesMessage))
