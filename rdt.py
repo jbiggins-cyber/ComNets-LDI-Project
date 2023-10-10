@@ -1,3 +1,6 @@
+from math import ceil
+
+BYTE_SIZE = 8
 
 def str2Bin(message: str):
     # This function converts a string to a unicode array of bit characters.
@@ -24,55 +27,12 @@ def bin2Str(message: list):
     # This function converts a unicode binary of bit characters back to a string.
     # The binary array could potentially be corrupted.
 
-    # Initialising
-    i = 0
-    currentBytes = []
-    currentChar = ''
-    uniqueVal = 0
-    messageStr = ""
-    bitStr = ""
-
-    # Creating byte arrays
-    while message:
-
-        currentBytes = []
-        unicodePrefix = ''.join(message[0:6])
-        if unicodePrefix[0] == '0':                     # Unicode is 1 byte
-            while i < 8:
-                currentBytes += message.pop(0)
-                i += 1
-            bitStr = ''.join(currentBytes)
-            uniqueVal = int(bitStr, 2)
-            currentChar = chr(uniqueVal)
-        elif unicodePrefix[0:3] == "110":    # Unicode is 2 bytes
-            while i < 16:
-                currentBytes += message.pop(0)
-                i += 1
-            bitStr = ''.join(currentBytes)
-            uniqueVal = int(bitStr, 2)
-            currentChar = chr(uniqueVal)
-        elif unicodePrefix[0:5] == "1110":   # Unicode is 3 bytes
-            while i < 24:
-                currentBytes += message.pop(0)
-                i += 1
-            bitStr = ''.join(currentBytes)
-            uniqueVal = int(bitStr, 2)
-            currentChar = chr(uniqueVal)
-        elif unicodePrefix[0:6] == "11110":  # Unicode is 4 bytes
-            while i < 32:
-                currentBytes += message.pop(0)
-                i += 1
-            bitStr = ''.join(currentBytes)
-            uniqueVal = int(bitStr, 2)
-            currentChar = chr(uniqueVal)
-        else:                                       # Unicode is not valid, replace with asterisk
-            while (i < 8) and message:
-                message.pop(0)
-                i += 1
-            currentChar = '*'
-        i = 0
-
-        messageStr += currentChar
+    byteArr = bytearray()
+    numBytes = ceil(len(message) / BYTE_SIZE)
+    bitStr = ''.join(message)
+    value = int(bitStr, 2)
+    byteArr = value.to_bytes(numBytes)
+    messageStr = byteArr.decode('utf-8')
         
     return messageStr
 
@@ -85,6 +45,6 @@ def bytes2Bin(payload: bytes):
 message = "This is a tϧst message string!"
 print("Original message: {}".format(message))
 unicodeMessage = str2Bin(message)
-print("Binary: {}".format(''.join(unicodeMessage)))
+print("Message to binary: {}".format(''.join(unicodeMessage)))
 decodedMessage = bin2Str(unicodeMessage)
-print("Decoded message: {}".format(decodedMessage))
+print("Binary to string: {}".format(decodedMessage))
