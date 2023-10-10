@@ -3,41 +3,41 @@ from math import ceil
 BYTE_SIZE = 8
 
 def str2Bin(message: str):
-    # This function converts a string to a unicode array of bit characters.
+    # This function converts a string to a unicode list of bit characters.
     # (Unicode is commonly used to assign unique numbers to characters)
     # We need this function if we want to randomly corrupt the message,
     # or compute a checksum.
 
     # Initialising
-    binArr = []
+    binList = []
 
     # Converts string into bytes object
     unicodeMessage = message.encode('utf-8')
 
     # Convert each unique unicode byte representing a character into binary
     for uniqueVal in unicodeMessage:
-        unicode = bin(uniqueVal)[2:]    # Need to ignore first two string elements '0b'
-        while len(unicode) % 8:         # Need to add leading 0's to fill out bytes
+        unicode = bin(uniqueVal)[2:]    # Ignores first two string elements '0b'
+        while len(unicode) % 8:         # Adds leading 0's to fill out bytes
             unicode = '0' + unicode
         for bit in unicode:
-            binArr.append(bit)
-    return binArr
+            binList.append(bit)
+    return binList
 
 def bin2Str(message: list):
-    # This function converts a unicode binary of bit characters back to a string.
-    # The binary array could potentially be corrupted.
+    # This function converts a unicode list of bit characters back to a string.
+    # The binary list could potentially be corrupted.
 
-    byteArr = bytearray()
+    byteList = bytearray()
     numBytes = ceil(len(message) / BYTE_SIZE)
     bitStr = ''.join(message)
     value = int(bitStr, 2)
-    byteArr = value.to_bytes(numBytes)
-    messageStr = byteArr.decode('utf-8')
+    byteList = value.to_bytes(numBytes)
+    messageStr = byteList.decode('utf-8')
         
     return messageStr
 
 def bytes2Bin(payload: bytes):
-    # This function converts the received payload from bytes into a unicode binary array.
+    # This function converts the received payload from bytes into a unicode list of bit characters.
     # We need this function to verify a checksum.
 
     raise NotImplementedError()
