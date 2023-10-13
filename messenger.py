@@ -45,7 +45,7 @@ class Messenger():
 
         packets_to_send: list[str] = self._split_data_into_packets(data)
 
-        print("MSG: SEND: will send:", packets_to_send)
+        print("MSG: SEND: will send: \033[33m", packets_to_send, '\033[0m')
 
         for packet in packets_to_send:
             self.rdt.send_fsm(self.transport, packet)
@@ -64,22 +64,23 @@ class Messenger():
             # this check sees if there's any more data to be read on the socket
             # if we have read previously in this loop, then we're within the receipt state machine, and no data means we're done
             # if we've never read anything, then we are a server pending on a new receipt from the client, and so we just keep looping
-            print(more_data)
+            # print(more_data)
 
             if more_data[0] or remaining_timeout > 0:
 
                 # getting here mean we've received data
                 # print('more to receive')
-                have_received_data = True
 
                 recv_buffer = self.transport.receive()
+                if not have_received_data:
+                    print("MSG: RCV: Received Messenger comms:")
+                have_received_data = True
                 header_params, data = self._extract(recv_buffer)
 
-                # the python socket API is combining the data we received into a single buffer!
-                print('MSG: RCV: header:\033[31m', header_params, '\033[0m')
-                print('MSG: RCV: data:\033[32m [[', data, ']]\033[0m')
+                # print('MSG: RCV: header:\033[31m', header_params, '\033[0m')
+                # print('MSG: RCV: data:\033[32m [[', data, ']]\033[0m')
 
-                print("MSG: RCV: Received Messenger comms:\n" + "\tHeader: " + str(header_params) + "\n\tData: " + data + "\n------")
+                print("Header: \033[31m" + str(header_params) + "\033[0m\nData: [\033[32m" + data + "\033[0m]\n------")
 
                 received_data_buffer.append((header_params, data))
 

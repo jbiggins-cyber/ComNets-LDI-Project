@@ -21,7 +21,7 @@ try:
             m.send(data)
             r = m.receive()
 
-            print("GOT: ", r)
+            print("CLIENT: received [[" + r + "]]")
 
     # todo handle timeout
     m.finish()
