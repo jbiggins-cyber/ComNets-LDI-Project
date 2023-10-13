@@ -3,7 +3,7 @@ import time
 from math import ceil
 
 from transport import *
-# from rdt_protocol import *
+from rdt_protocol import *
 
 # I think this needs to be changed somewhat
 # once send is called, the whole Messenger API should block until the correct ACKs (or whatever the protocol dictates) have been received
@@ -30,19 +30,20 @@ class Messenger():
     PACKET_DATA_LEN = 20 # bytes -- todo change
     RECV_TIMEOUT = 2 # seconds
 
-    def __init__(self, client_server: str, sock_type: str, ip: str):
-        self.sock_type = sock_type
-        self.ip = ip
+    def __init__(self, client_server: str, sock_type: str, ip: str, rdt_ver: str):
+        self.sock_type: str = sock_type
+        self.ip: str = ip
         # We hold the transport class so it can be used at any time to get a new socket of the right type
         self.__transport_class = SocketFactory.new_socket(client_server, sock_type)
+        self.rdt: RDTProtocol = RDTFactory(rdt_ver)
 
     def _get_new_sock(self):
-        self.transport = self.__transport_class(self.ip)
+        self.transport: GenericSocket = self.__transport_class(self.ip)
 
     def send(self, data: str):
         """Format this data with our own RDP protocol, then send over the lower-level base"""
 
-        packets_to_send = self._split_data_into_packets(data)
+        packets_to_send: list[str] = self._split_data_into_packets(data)
 
         print("MSG: SEND: will send:", packets_to_send)
 
