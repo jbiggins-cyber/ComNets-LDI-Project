@@ -11,7 +11,7 @@ SOCK_TYPE = sys.argv[1]
 try:
     # make any number of connections until termination
     while True:
-        m = messenger.ServerMessenger(sock_type=SOCK_TYPE, ip='localhost')
+        m = messenger.ServerMessenger(sock_type=SOCK_TYPE, ip='localhost', rdt_ver="1.0")
 
         print("Successfully started " + m.sock_type + " server")
 

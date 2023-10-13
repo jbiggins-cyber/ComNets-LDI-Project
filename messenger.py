@@ -35,7 +35,7 @@ class Messenger():
         self.ip: str = ip
         # We hold the transport class so it can be used at any time to get a new socket of the right type
         self.__transport_class = SocketFactory.new_socket(client_server, sock_type)
-        self.rdt: RDTProtocol = RDTFactory(rdt_ver)
+        self.rdt: RDTProtocol = RDTFactory.create(rdt_ver)
 
     def _get_new_sock(self):
         self.transport: GenericSocket = self.__transport_class(self.ip)
@@ -48,7 +48,7 @@ class Messenger():
         print("MSG: SEND: will send:", packets_to_send)
 
         for packet in packets_to_send:
-            self.transport.send(packet)
+            self.rdt.send_fsm(self.transport, packet)
 
     def receive(self):
         """Parse out the RDP protocol and just return our data"""
@@ -176,11 +176,11 @@ class Messenger():
 
 
 class ClientMessenger(Messenger):
-    def __init__(self, sock_type: str, ip: str):
-        super().__init__('client', sock_type, ip)
+    def __init__(self, sock_type: str, ip: str, rdt_ver: str):
+        super().__init__('client', sock_type, ip, rdt_ver)
         self._get_new_sock()
 
 class ServerMessenger(Messenger):
-    def __init__(self, sock_type: str, ip: str):
-        super().__init__('server', sock_type, ip)
+    def __init__(self, sock_type: str, ip: str, rdt_ver: str):
+        super().__init__('server', sock_type, ip, rdt_ver)
         self._get_new_sock()

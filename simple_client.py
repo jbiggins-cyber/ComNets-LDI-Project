@@ -8,7 +8,7 @@ if (len(sys.argv) < NUM_ARGS):
 SOCK_TYPE = sys.argv[1]
 
 try:
-    m = messenger.ClientMessenger(sock_type=SOCK_TYPE, ip='localhost')
+    m = messenger.ClientMessenger(sock_type=SOCK_TYPE, ip='localhost', rdt_ver="1.0")
 
     print("Successfully started " + m.sock_type + " client")
 
