@@ -30,18 +30,18 @@ class Messenger():
     PACKET_DATA_LEN = 20 # bytes -- todo change
     RECV_TIMEOUT = 2 # seconds
 
-    def __init__(self, client_server: str, sock_type: str, ip: str, rdt_ver: str):
+    def __init__(self, client_server: str, sock_type: str, ip: str, rdt: RDTProtocolStrategy):
         self.sock_type: str = sock_type
         self.ip: str = ip
         # We hold the transport class so it can be used at any time to get a new socket of the right type
         self.__transport_class = SocketFactory.new_socket(client_server, sock_type)
-        self.rdt: RDTProtocol = RDTFactory.create(rdt_ver)
+        self.rdt: RDTProtocol = rdt
 
     def _get_new_sock(self):
         self.transport: GenericSocket = self.__transport_class(self.ip)
 
     def send(self, data: str):
-        """Format this data with our own RDP protocol, then send over the lower-level base"""
+        """Break the data up into packets and then send via the RDT protocol"""
 
         packets_to_send: list[str] = self._split_data_into_packets(data)
 
@@ -50,44 +50,12 @@ class Messenger():
         for packet in packets_to_send:
             self.rdt.send_fsm(self.transport, packet)
 
-    def receive(self):
-        """Parse out the RDP protocol and just return our data"""
-        received_data_buffer = []
+    def receive(self) -> str:
+        """Use our RDT protocol to receive data"""
+        received_data: list[tuple[str, str]] = self.rdt.recv_fsm(self.transport)
 
-        have_received_data = False
-        start_time = time.time()
-        while True:
-            time.sleep(1)
-            remaining_timeout = self.RECV_TIMEOUT - (time.time() - start_time)
-            
-            more_data = select.select([self.transport.sock], [], [], self.RECV_TIMEOUT)
-            # this check sees if there's any more data to be read on the socket
-            # if we have read previously in this loop, then we're within the receipt state machine, and no data means we're done
-            # if we've never read anything, then we are a server pending on a new receipt from the client, and so we just keep looping
-            # print(more_data)
-
-            if more_data[0] or remaining_timeout > 0:
-
-                # getting here mean we've received data
-                # print('more to receive')
-
-                recv_buffer = self.transport.receive()
-                if not have_received_data:
-                    print("MSG: RCV: Received Messenger comms:")
-                have_received_data = True
-                header_params, data = self._extract(recv_buffer)
-
-                # print('MSG: RCV: header:\033[31m', header_params, '\033[0m')
-                # print('MSG: RCV: data:\033[32m [[', data, ']]\033[0m')
-
-                print("Header: \033[31m" + str(header_params) + "\033[0m\nData: [\033[32m" + data + "\033[0m]\n------")
-
-                received_data_buffer.append((header_params, data))
-
-                # if we have the number of packets we need, stitch them together
-                if len(received_data_buffer) == received_data_buffer[0][0]["total"]:
-                    # sort the packets in order and join
-                    return ''.join([r[1] for r in sorted(received_data_buffer, key=lambda r:r[0]["seq"])])
+        # For now, just return our data as a string
+        return ''.join([r[1] for r in received_data])
 
     def finish(self):
         self.send("FINMSG")
@@ -177,11 +145,11 @@ class Messenger():
 
 
 class ClientMessenger(Messenger):
-    def __init__(self, sock_type: str, ip: str, rdt_ver: str):
-        super().__init__('client', sock_type, ip, rdt_ver)
+    def __init__(self, sock_type: str, ip: str, rdt: RDTProtocolStrategy):
+        super().__init__('client', sock_type, ip, rdt)
         self._get_new_sock()
 
 class ServerMessenger(Messenger):
-    def __init__(self, sock_type: str, ip: str, rdt_ver: str):
-        super().__init__('server', sock_type, ip, rdt_ver)
+    def __init__(self, sock_type: str, ip: str, rdt: RDTProtocolStrategy):
+        super().__init__('server', sock_type, ip, rdt)
         self._get_new_sock()

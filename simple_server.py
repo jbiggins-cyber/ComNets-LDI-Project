@@ -2,6 +2,8 @@ from datetime import datetime
 import messenger
 import sys
 
+from rdt_protocol import RDTFactory
+
 NUM_ARGS = 2
 if (len(sys.argv) < NUM_ARGS):
     raise IndexError("Not enough input arguments specified!\n\n"\
@@ -11,7 +13,7 @@ SOCK_TYPE = sys.argv[1]
 try:
     # make any number of connections until termination
     while True:
-        m = messenger.ServerMessenger(sock_type=SOCK_TYPE, ip='localhost', rdt_ver="1.0")
+        m = messenger.ServerMessenger(sock_type=SOCK_TYPE, ip='localhost', rdt=RDTFactory.create("1.0"))
 
         print("Successfully started " + m.sock_type + " server")
 
