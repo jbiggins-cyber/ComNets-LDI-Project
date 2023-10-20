@@ -1,6 +1,6 @@
-from math import ceil
 import random
 import numpy as np
+from type_manipulation import *
 
 BYTE_SIZE =         8
 BASE2 =             2
@@ -9,73 +9,11 @@ SEED =              1083430
 FAIL =              True
 SUCCESS =           False
 
-def str2Bin(message: str):
-    # This function converts a string to a unicode list of bit characters.
-    # (Unicode is commonly used to assign unique numbers to characters)
-    # We need this function if we want to randomly corrupt the message,
-    # or compute a checksum.
-
-    # Converts string into bytes object using utf-8 encoding
-    unicodeMessage = message.encode('utf-8')
-
-    return bytes2Bin(unicodeMessage)
-
-def bin2Str(message: list):
-    # This function converts a unicode list of bit characters back to a message string.
-    # The binary list could potentially be corrupted.
-
-    byteList = bytearray()
-    numBytes = ceil(len(message) / BYTE_SIZE)
-    bitStr = ''.join(message)
-    value = int(bitStr, BASE2)
-    byteList = value.to_bytes(numBytes)
-    messageStr = byteList.decode('utf-8')
-        
-    return messageStr
-
-def bytes2Bin(payload: bytes):
-    # This function converts the received payload from bytes into a unicode list of bit characters.
-    # We need this function to verify a checksum.
-
-    # Initialising
-    binList = []
-
-    # Convert each unique unicode representing a character into binary
-    for uniqueVal in payload:
-        unicode = bin(uniqueVal)[2:]            # Ignores first two string elements '0b'
-        while len(unicode) % BYTE_SIZE:         # Adds leading 0's to fill out bytes
-            unicode = '0' + unicode
-        for bit in unicode:
-            binList.append(bit)
-    return binList
-
-def bin2Bytes(unicodeBits: list):
-    # This function converts the unicode list of bit characters into a Python bytearray.
-    # We need this to check if the message has been successfully corrupted, because 
-    # randomly corrupting the unicode may lead to the decode() function not working.
-
-    # Initialising
-    localUnicodeBits = unicodeBits[:]
-    byteMessage = bytearray()
-    currentByte = []
-
-    # Converts each 8 bits to a byte and appends it to the bytearray
-    while localUnicodeBits:
-        currentByte = []
-        for i in range(BYTE_SIZE):
-            currentByte.append(localUnicodeBits.pop(0))
-        byteStr = ''.join(currentByte)
-        byteVal = int(byteStr, BASE2)
-        byteMessage.append(byteVal)
-
-    return bytes(byteMessage)
-
 def corruptBits(unicodeBits: list, numCorrupts: int):
     # This function takes a unicode list of bit characters and the number of bits the user
     # wants to corrupt. It uses Python's "Random" module to randomly choose bits to flip,
     # and returns the corrupted list of bit characters.
 
-    random.seed(SEED)
     corruptedUnicode = unicodeBits[:]
     corruptIdxs = random.sample(range(0, len(corruptedUnicode)), numCorrupts)
     for corruptIdx in corruptIdxs:
@@ -85,14 +23,23 @@ def corruptBits(unicodeBits: list, numCorrupts: int):
             corruptedUnicode[corruptIdx] = '0'
     return corruptedUnicode
 
-def burstError(unicodeBits: list, burstLength: int):
+def corruptBytes(msg: bytearray(), numCorrupts: int):
+    # This function takes a message bytearray() and number of bits the user wants to corrupt.
+    # It uses Python's "Random" module to randomly choose bits to flip,
+    # and returns the corrupted bytearray().
+
+    binMsg = bytes2Bin(msg)
+    corruptedBinMsg = corruptBits(binMsg, numCorrupts)
+    corruptedBytesMsg = bin2Bytes(corruptedBinMsg)
+    return corruptedBytesMsg
+
+def burstErrorBits(unicodeBits: list, burstLength: int):
     # This function takes a unicode list of bit characters and the 
     # desired length of the burst error as an integer. 
     # It uses Python's "Random" module to randomly choose an initial bit,
     # flips bits following the initial bit for the burstLength,
     # and returns the corrupted list of bit characters.
 
-    random.seed(SEED)
     corruptedUnicode = unicodeBits[:]
     initialCorrupt = random.randrange(0, len(corruptedUnicode)-burstLength)
     for i in range(initialCorrupt, initialCorrupt+burstLength):
@@ -101,6 +48,18 @@ def burstError(unicodeBits: list, burstLength: int):
         else:
             corruptedUnicode[i] = '0'
     return corruptedUnicode
+
+def burstErrorBytes(msg: bytearray(), burstLength: int):
+    # This function takes a bytearray() message and the 
+    # desired length of the burst error as an integer. 
+    # It uses Python's "Random" module to randomly choose an initial bit,
+    # flips bits following the initial bit for the burstLength,
+    # and returns the corrupted bytearray() message.
+
+    binMsg = bytes2Bin(msg)
+    burstErrorBinMsg = burstErrorBits(binMsg, burstLength)
+    burstErrorBytesMsg = bin2Bytes(burstErrorBinMsg)
+    return burstErrorBytesMsg
 
 # TO DO: rename this as UDP checksum
 
@@ -301,45 +260,48 @@ def verify2DParityCheckList (unicodeBits: list, sndrParityBits: list):
 
     return [localUnicodeBits, SUCCESS]
 
-print()
-message = "This is a tϧst message string!"
-print("Original message: {}".format(message))
-unicodeMessage = str2Bin(message)
-print("Message to binary: {}".format(''.join(unicodeMessage)))
-decodedMessage = bin2Str(unicodeMessage)
-print("Binary to string: {}".format(decodedMessage))
+# print()
+# message = "This is a tϧst message string!"
+# print("Original message: {}".format(message))
+# unicodeMessage = str2Bin(message)
+# print("Message to binary: {}".format(''.join(unicodeMessage)))
+# decodedMessage = bin2Str(unicodeMessage)
+# print("Binary to string: {}".format(decodedMessage))
 
-print()
-byteArr = message.encode('utf-8')
-print("Original message to bytes: {}".format(byteArr))
-unicodeBytes = bytes2Bin(byteArr)
-print("Bytes to binary: {}".format(''.join(unicodeBytes)))
-decodedBytesMessage = bin2Str(unicodeBytes)
-print("Decoded bytes payload: {}".format(decodedBytesMessage))
+# print()
+# byteArr = message.encode('utf-8')
+# print("Original message to bytes: {}".format(byteArr))
+# unicodeBytes = bytes2Bin(byteArr)
+# print("Bytes to binary: {}".format(''.join(unicodeBytes)))
+# decodedBytesMessage = bin2Str(unicodeBytes)
+# print("Decoded bytes payload: {}".format(decodedBytesMessage))
 
-print()
-corruptedBits = corruptBits(unicodeMessage, 1)
-corruptedMessage = bin2Bytes(corruptedBits)
-print("Original message bytes:           {}".format(byteArr))
-print("Corrupted original message bytes: {}".format(corruptedMessage))
+# print()
+# corruptedBits = corruptBits(unicodeMessage, 1)
+# corruptedMessage = bin2Bytes(corruptedBits)
+# print("Original message bytes:           {}".format(byteArr))
+# print("Corrupted original message bytes: {}".format(corruptedMessage))
 
-print()
-checksum = generateChecksum(unicodeMessage)
-print("Checksum of original message: {}".format(checksum))
-print("Checksum verification of original message: {}".format(verifyChecksum(unicodeMessage, checksum)))
-print("Checksum verification of corrupted message: {}".format(verifyChecksum(corruptedBits, checksum)))
+# print()
+# checksum = generateChecksum(unicodeMessage)
+# print("Checksum of original message: {}".format(checksum))
+# print("Checksum verification of original message: {}".format(verifyChecksum(unicodeMessage, checksum)))
+# print("Checksum verification of corrupted message: {}".format(verifyChecksum(corruptedBits, checksum)))
 
-print()
-bytesArray = generate2DParityCheck(unicodeMessage)
-print("Bytes array: {}".format(bytesArray))
-sndrParity2DList = generate2DParityCheckList(unicodeMessage)
-[correctedBits, success] = verify2DParityCheckList(corruptedBits, sndrParity2DList)
-if success == SUCCESS: 
-    correctedMessage = bin2Str(correctedBits)
-    print("Corrected message: {}".format(correctedMessage))
+# print()
+# bytesArray = generate2DParityCheck(unicodeMessage)
+# print("Bytes array: {}".format(bytesArray))
+# sndrParity2DList = generate2DParityCheckList(unicodeMessage)
+# [correctedBits, success] = verify2DParityCheckList(corruptedBits, sndrParity2DList)
+# if success == SUCCESS: 
+#     correctedMessage = bin2Str(correctedBits)
+#     print("Corrected message: {}".format(correctedMessage))
 
-print()
-someBits = ['0', '1', '1', '0', '1', '0', '0', '1']
-print("Original message bits: {}".format(someBits))
-burstedBits = burstError(someBits, 3)
-print("Burst error {}".format(burstedBits))
+# print()
+# someBits = ['0', '1', '1', '0', '1', '0', '0', '1']
+# print("Original message bits: {}".format(someBits))
+# burstedBits = burstErrorBits(someBits, 2)
+# print("Burst error {}".format(burstedBits))
+
+# print()
+# print("Corrupted bytes: {}".format(corruptBytes(byteArr, 2)))
