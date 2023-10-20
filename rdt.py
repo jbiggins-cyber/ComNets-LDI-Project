@@ -75,14 +75,31 @@ def corruptBits(unicodeBits: list, numCorrupts: int):
     # wants to corrupt. It uses Python's "Random" module to randomly choose bits to flip,
     # and returns the corrupted list of bit characters.
 
+    random.seed(SEED)
     corruptedUnicode = unicodeBits[:]
     corruptIdxs = random.sample(range(0, len(corruptedUnicode)), numCorrupts)
-    random.seed(SEED)
     for corruptIdx in corruptIdxs:
         if corruptedUnicode[corruptIdx] == '0':
             corruptedUnicode[corruptIdx] = '1'
         else:
             corruptedUnicode[corruptIdx] = '0'
+    return corruptedUnicode
+
+def burstError(unicodeBits: list, burstLength: int):
+    # This function takes a unicode list of bit characters and the 
+    # desired length of the burst error as an integer. 
+    # It uses Python's "Random" module to randomly choose an initial bit,
+    # flips bits following the initial bit for the burstLength,
+    # and returns the corrupted list of bit characters.
+
+    random.seed(SEED)
+    corruptedUnicode = unicodeBits[:]
+    initialCorrupt = random.randrange(0, len(corruptedUnicode)-burstLength)
+    for i in range(initialCorrupt, initialCorrupt+burstLength):
+        if corruptedUnicode[i] == '0':
+            corruptedUnicode[i] = '1'
+        else:
+            corruptedUnicode[i] = '0'
     return corruptedUnicode
 
 # TO DO: rename this as UDP checksum
@@ -320,3 +337,9 @@ sndrParity2DList = generate2DParityCheckList(unicodeMessage)
 if success == SUCCESS: 
     correctedMessage = bin2Str(correctedBits)
     print("Corrected message: {}".format(correctedMessage))
+
+print()
+someBits = ['0', '1', '1', '0', '1', '0', '0', '1']
+print("Original message bits: {}".format(someBits))
+burstedBits = burstError(someBits, 3)
+print("Burst error {}".format(burstedBits))
