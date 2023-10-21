@@ -39,11 +39,21 @@ def generateUDPChecksum(msg: bytearray()):
     checksumBits = __generateUDPChecksumBits(binMsg)
     return checksumBits
 
-def verifyUDPChecksum(unicodeBits: list, checksum: list):
+def verifyUDPChecksum(msg: bytearray(), checksum: list):
+    # This function takes a bytearray() message and the checksum as a 
+    # list of bit characters.
+    # Returns 0 if the checksum is verified correctly.
+    # Returns 1 otherwise.
+
+    binMsg = bytes2Bin(msg)
+    return __verifyUDPChecksumBits(binMsg, checksum)
+
+
+def __verifyUDPChecksumBits(unicodeBits: list, checksum: list):
     # This function takes the unicode list of bit characters and the checksum as a 
     # list of bit characters.
     # Returns 0 if the checksum is verified correctly.
-    # Returns 1 otherwise
+    # Returns 1 otherwise.
 
     localChecksum = checksum[:]
     verify = __generateUDPChecksumBits(unicodeBits + checksum)
