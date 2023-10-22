@@ -68,7 +68,7 @@ def generate2DParityCheck(unicodeBits: list):
     # forms it into an array and returns a 2D parity check 
     # as a list of bit integers.
 
-        # Initialising 
+    # Initialising 
     numBytes = len(unicodeBits) // BYTE_SIZE
     bytes2DArray = np.empty((numBytes, BYTE_SIZE))
     bitSum = 0
@@ -88,6 +88,7 @@ def generate2DParityCheck(unicodeBits: list):
             parityList.append(0)
         else:
             parityList.append(1)
+            
     # Iterating through all columns
     for colIdx in range((np.shape(bytes2DArray)[1])):
         bitSum = np.sum(bytes2DArray[:, colIdx])
@@ -143,7 +144,7 @@ def verify2DParityCheck(unicodeBits: list, sndrParityBits: list):
         else:
             localUnicodeBits[rowErrorIdx*BYTE_SIZE + colErrorIdx] = '1'
 
-    # Checking if there were hidden bit errors
+    # Checking if there were hidden bit errors (repeat the 2D parity check one more time)
     recvParityBits = generate2DParityCheck(localUnicodeBits)
 
     # Verifying row parity
@@ -211,7 +212,7 @@ def __generateUDPChecksumBits(unicodeBits: list):
     currentByte = ''
     nextByte = ''
 
-    # Grabs each byte and checksums it with the next one
+    # Grabs each byte and mod2 sums it with the next one
     while localUnicodeBits:
         nextByte = ''
         for i in range(BYTE_SIZE):
