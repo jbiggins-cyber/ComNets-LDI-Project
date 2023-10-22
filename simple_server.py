@@ -1,3 +1,10 @@
+"""
+This script runs the server side of the communications
+It accepts socket type as an argument, which should preferrably be set to 'udp'
+
+This should start before the client so a binding is created
+"""
+
 from datetime import datetime
 import messenger
 import sys

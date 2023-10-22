@@ -1,3 +1,17 @@
+"""
+The Socket classes are an interface to python's socket api
+It handles the different set up required for the client and server sides of the
+socket process. Additionally, it can handle both TCP and UDP comms. These are
+managed through the subclasses:
+    - ClientTCPSocket
+    - ServerTCPSocket
+    - ClientUDPSocket
+    - ServerUDPSocket
+
+GenericSocket, TCPSocket, and UDPSocket are abstract classes, and shouldn't be
+used directly by the user
+"""
+
 import socket
 
 class SocketFactory():

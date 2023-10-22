@@ -1,24 +1,21 @@
+"""
+The Messenger class and its subclasses provide the interface for the
+application to use.
+Callers should instantiate either a ClientMessenger or ServerMessenger, and
+call the send, receive, and finish methods. The client should begin with send,
+while the server should begin with receive. Internal functions will break up
+the message into appropriate sized packets, and ensure its delivery.
+
+The ClientMessenger and ServerMessenger classes act as a convenience classes,
+setting up the required variables.
+"""
+
 import select
 import time
 from math import ceil
 
 from transport import *
 # from rdt_protocol import *
-
-# I think this needs to be changed somewhat
-# once send is called, the whole Messenger API should block until the correct ACKs (or whatever the protocol dictates) have been received
-# when receive is called, the API should block until we confirm that we have received the whole chunk desired.
-#   Unsure how to have this call pend til then? Maybe the whole lower level will allow us to pend?
-
-
-
-"""
-messenger child classes need to define
-- send (implement fsm)
-- receive (implement fsm)
-- _create_header
-- _parse_header
-"""
 
 class Messenger():
     """The Messenger class manages communication using a custom designed protocol"""
@@ -37,6 +34,7 @@ class Messenger():
         self.__transport_class = SocketFactory.new_socket(client_server, sock_type)
 
     def _get_new_sock(self):
+        """instantiate a socket from the class"""
         self.transport = self.__transport_class(self.ip)
 
     def send(self, data: str):
@@ -88,6 +86,7 @@ class Messenger():
                     return ''.join([r[1] for r in sorted(received_data_buffer, key=lambda r:r[0]["seq"])])
 
     def finish(self):
+        """Terminate a connection"""
         self.send("FINMSG")
         self.transport.close()
 
