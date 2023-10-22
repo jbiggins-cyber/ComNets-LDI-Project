@@ -1,5 +1,8 @@
 from rdt_functionality import *
 
+# This file is for testing private functions in the
+# rdt_functionality.py file.
+
 print()
 message = "This is a test message string!"
 print("Original message: {}".format(message))
