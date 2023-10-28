@@ -7,6 +7,7 @@ The server should start first so a binding is created
 
 import messenger
 import sys
+from rdt_protocol import RDTFactory
 
 NUM_ARGS = 2
 if (len(sys.argv) < NUM_ARGS):
@@ -15,7 +16,7 @@ if (len(sys.argv) < NUM_ARGS):
 SOCK_TYPE = sys.argv[1]
 
 try:
-    m = messenger.ClientMessenger(sock_type=SOCK_TYPE, ip='localhost')
+    m = messenger.ClientMessenger(sock_type=SOCK_TYPE, ip='localhost', rdt=RDTFactory.create("1.0"))
 
     print("Successfully started " + m.sock_type + " client")
 
@@ -28,7 +29,7 @@ try:
             m.send(data)
             r = m.receive()
 
-            print("GOT: ", r)
+            print("CLIENT: received [[" + r + "]]")
 
     # todo handle timeout
     m.finish()
