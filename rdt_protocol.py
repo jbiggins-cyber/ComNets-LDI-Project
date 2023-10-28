@@ -3,6 +3,7 @@ import time
 from math import ceil
 
 from transport import *
+from rdt_functionality import *
 
 class RDTProtocolStrategy():
     """Different protocols use the Strategy pattern"""
@@ -191,7 +192,48 @@ class RDTProtocol_v1(RDTProtocolStrategy):
 
 
 class RDTProtocol_v2_0(RDTProtocolStrategy):
-    pass
+
+    def send_fsm(self, socket: GenericSocket, data: str):
+        packets_to_send: list[str] = self._split_data_into_packets(data)
+        print("MSG: SEND: will send: \033[33m", packets_to_send, '\033[0m')
+        for packet in packets_to_send:
+            socket.send(packet)
+            while True:
+                receipt: str = socket.receive()
+                header, data = self._extract(receipt)
+                print(header)
+
+                # if this condition hits, we have successful ACK
+                if header["flags"] & self.FLAGS["ACK"]:
+                    break
+
+                # if this condition hits, we need to re-request
+                if header["flags"] & self.FLAGS["NACK"]:
+                    continue
+        return
+
+    def recv_fsm(self, socket: GenericSocket) -> list[tuple[str, str]]:
+        received_data_buffer = []
+        have_received_data = False
+
+        while True:
+            receipt = socket.receive()
+            header, data = self._extract(receipt)
+            checksum = rdt_functionality.verifyUDPChecksum(data, header["check"])
+
+            # because this is RDT2.0, we make the assumption that the ACK is no affected by corruption
+            if checksum_valid:
+                received_data_buffer.append((header, data))
+                # header["flags"] = self.FLAGS["ACK"]
+                socket.send("ACK") # temp
+            elif not checksum_valid:
+                socket.send("NACK") # temp
+
+            if not have_received_data:
+                expected_packets = int(header["total"])
+                have_received_data = True
+            return
+
 
 class RDTProtocol_v2_1(RDTProtocolStrategy):
     pass
