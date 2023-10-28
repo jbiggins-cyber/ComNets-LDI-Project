@@ -20,7 +20,7 @@ SOCK_TYPE = sys.argv[1]
 try:
     # make any number of connections until termination
     while True:
-        m = messenger.ServerMessenger(sock_type=SOCK_TYPE, ip='localhost', rdt=RDTFactory.create("1.0"))
+        m = messenger.ServerMessenger(sock_type=SOCK_TYPE, ip='localhost', rdt=RDTFactory.create("2.0"))
 
         print("Successfully started " + m.sock_type + " server")
 

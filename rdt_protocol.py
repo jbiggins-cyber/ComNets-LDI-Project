@@ -3,7 +3,7 @@ import time
 from math import ceil
 
 from transport import *
-from rdt_functionality import *
+import rdt_functionality
 
 class RDTProtocolStrategy():
     """Different protocols use the Strategy pattern"""
@@ -37,7 +37,7 @@ class RDTProtocolStrategy():
         raise NotImplementedError()
 
 
-    def _split_data_into_packets(self, data: str) -> list[str]:
+    def _split_data_into_packets(self, data: str, flags: int = 0x00) -> list[str]:
         """
         Split up a message by size
         This does the make_pkt() functionality
@@ -47,11 +47,13 @@ class RDTProtocolStrategy():
 
         for i in range(n_packets):
             data_idx = i*self.PACKET_DATA_LEN
-            # insert checksum here!
+            next_data = data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
+
             # seq = i+1 means that seq of last packet == total
-            header_params = {"seq": i+1, "total": n_packets, "flags": 0x00, "check": "abcdefg"}
+            checksum = ''.join(rdt_functionality.generateUDPChecksum(next_data.encode('utf-8')))
+            header_params = {"seq": i+1, "total": n_packets, "flags": flags, "check": checksum}
             header = self._create_header(header_params)
-            next_packet = header + '\n' + data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
+            next_packet = header + '\n' + next_data
             packet_list.append(next_packet)
 
         return packet_list
@@ -219,15 +221,17 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
         while True:
             receipt = socket.receive()
             header, data = self._extract(receipt)
-            checksum = rdt_functionality.verifyUDPChecksum(data, header["check"])
+            print(list(header["check"]))
+            checksum = rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
 
             # because this is RDT2.0, we make the assumption that the ACK is no affected by corruption
             if checksum_valid:
                 received_data_buffer.append((header, data))
-                # header["flags"] = self.FLAGS["ACK"]
-                socket.send("ACK") # temp
+                header["flags"] = self.FLAGS["ACK"]
+                socket.send(self._create_header(header))
             elif not checksum_valid:
-                socket.send("NACK") # temp
+                header["flags"] = self.FLAGS["NACK"]
+                socket.send(self._create_header(header))
 
             if not have_received_data:
                 expected_packets = int(header["total"])
