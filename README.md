@@ -8,20 +8,28 @@ This project contains the code used for the Communication Networks LDI project. 
 A Static Design Diagram and System Sequence Diagram are shown below in `static_design_diagram.pdf` and `system_sequence_diagram.pdf` respectively.
 
 ## Usage
-To set up client/server communications, simply enter one of the following commands, or use Docker as shown below.
+To set up client/server communications, simply enter one of the following commands, or use Docker as shown later.
 ```
-python3 simple_server.py udp
-python3 simple_client.py udp
+python3 simple_server.py $rdt_ver
+python3 simple_client.py $rdt_ver
 ```
 From the client side, you can then type messages to send to the server. Note: start the server first, or the client won't have a binding to connect to.
 
+`rdt_ver` is in `{1.0,2.0,2.1,2.2,3.0}`. The options to the script are 
+```
+-h, --help              show this help message and exit
+--sock_type {udp,tcp}   Socket type (choose from: udp, tcp, default: udp)
+--ip IP                 IP address (default: localhost)
+```
+
+### Structure
 
 The Messenger class and its subclasses provide the interface for the
 application to use. Callers should instantiate either a `ClientMessenger` or `ServerMessenger`, and call the send, receive, and finish methods. The client should begin with send, while the server should begin with receive. Internal functions will break up the message into appropriate sized packets, and ensure its delivery.
 
 The `ClientMessenger` and `ServerMessenger` classes act as a convenience classes, setting up the required variables.
 
-The Socket classes are an interface to python's `socket` api It handles the different set up required for the client and server sides of the socket process. Additionally, it can handle both TCP and UDP comms. These are managed through the subclasses:
+The Socket classes are an interface to python's `socket` api. They handle the different set up required for the client and server sides of the socket process. Additionally, it can handle both TCP and UDP comms. These are managed through the subclasses:
 
 - `ClientTCPSocket`
 - `ServerTCPSocket`
@@ -37,7 +45,7 @@ used directly by the user.
 
 `checksum_performance_testing.py` runs a simulation of nearly 3 million messages for a variety of bit error quantities and burst error lengths, to determine the ability for the checksums to resolve errors in the incoming data.
 
-# Using Docker
+## Using Docker
 
 The client and server can also be launched using Docker. To do so, you will need to start one container for each. In separate terminals, type:
 ```
@@ -50,4 +58,9 @@ The client and server can also be launched using Docker. To do so, you will need
 ```
 
 After making changes to code, you will need to rebuild the images.
+
+The Docker containers are removed automatically. To remove the network, use 
+```
+./docker_tools.sh cleanup
+```
 

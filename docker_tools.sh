@@ -1,6 +1,10 @@
 #!/bin/sh
 HELP_TEXT="Shell script to manage docker images.
-Usage:  ./docker_tools.sh [build|run] [client|server]"
+Usage for building/running:
+    ./docker_tools.sh [build|run] [client|server]
+To remove the network:  
+   ./docker_tools.sh cleanup
+"
 
 function check_docker_image() {
     docker inspect --type=image "$1" > /dev/null 2>&1
@@ -25,9 +29,13 @@ elif [ "$1" == "run" ]; then
         check_docker_image rdt-client || docker build -t rdt-client --target client .
         docker run --rm -it --network my-network --name client-ip rdt-client
     elif [ "$2" == "server" ]; then
-        check_docker_image rdt-server || docker build -t rdt-server --target server .s
+        check_docker_image rdt-server || docker build -t rdt-server --target server .
+        # the name server-ip lets us communicate to the container with that as the IP
         docker run --rm -it --network my-network --name server-ip rdt-server
     fi
+
+elif [ "$1" == "cleanup" ]; then
+    docker network prune
 
 else
     echo "$HELP_TEXT"
