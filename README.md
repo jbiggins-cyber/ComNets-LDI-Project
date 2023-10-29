@@ -64,3 +64,33 @@ The Docker containers are removed automatically. To remove the network, use
 ./docker_tools.sh cleanup
 ```
 
+## Using Docker and GNS3
+
+### Exporting images
+
+When the above Docker steps have been followed, images can be pushed to dockerhub like
+```
+docker tag rdt-client adleris/rdt-client
+docker push adleris/rdt-client
+```
+
+### Pulling images into GNS3
+
+Get the images:
+
+- Open a GNS3 project
+- *edit* > *preferences* > *docker containers*
+- *new* > *new image* > "adleris/rdt-client" (or server) 
+- accept name > 1 adaptor
+- *start command* = `bash`
+- *next* > *finish*
+
+Configure the topology:
+
+- From the *End Devices* panel, drag the images into the topology, along with a switch and router
+- Start the router and configure it as per workshop 2
+- Right click on each image, *Edit config* and assign a static IP eg 192.168.0.2
+- Restart the network
+- Open a console for each image
+- Enter `python simple_client.py 1.0 --ip 192.168.0.2`, adjusting as required
+- Enjoy communications!

@@ -2,7 +2,7 @@
 HELP_TEXT="Shell script to manage docker images.
 Usage for building/running:
     ./docker_tools.sh [build|run] [client|server]
-To remove the network:  
+To remove the network:
    ./docker_tools.sh cleanup
 "
 
@@ -10,7 +10,7 @@ function check_docker_image() {
     docker inspect --type=image "$1" > /dev/null 2>&1
 }
 
-# build 
+# build
 if [ "$1" == "build" ]; then
     if [ "$2" == "client" ]; then
         docker build -t rdt-client --target client .
