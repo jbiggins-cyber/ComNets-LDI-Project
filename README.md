@@ -8,7 +8,7 @@ This project contains the code used for the Communication Networks LDI project. 
 A Static Design Diagram and System Sequence Diagram are shown below in `static_design_diagram.pdf` and `system_sequence_diagram.pdf` respectively.
 
 ## Usage
-To set up client/server communications, simply enter one of the following commands:
+To set up client/server communications, simply enter one of the following commands, or use Docker as shown below.
 ```
 python3 simple_server.py udp
 python3 simple_client.py udp
@@ -36,3 +36,18 @@ used directly by the user.
 `rdt_functionality_testing.py` runs tests on the conversion functionality of the checksums and binary encoding.
 
 `checksum_performance_testing.py` runs a simulation of nearly 3 million messages for a variety of bit error quantities and burst error lengths, to determine the ability for the checksums to resolve errors in the incoming data.
+
+# Using Docker
+
+The client and server can also be launched using Docker. To do so, you will need to start one container for each. In separate terminals, type:
+```
+./docker_tools.sh build server
+./docker_tools.sh run server
+```
+```
+./docker_tools.sh build client
+./docker_tools.sh run client
+```
+
+After making changes to code, you will need to rebuild the images.
+
