@@ -25,7 +25,7 @@ class Messenger():
         self.ip: str = ip
         # We hold the transport class so it can be used at any time to get a new socket of the right type
         self.__transport_class = SocketFactory.new_socket(client_server, sock_type)
-        self.rdt: RDTProtocol = rdt
+        self.rdt = rdt
 
     def _get_new_sock(self):
         """instantiate a socket from the class"""
@@ -38,7 +38,6 @@ class Messenger():
     def receive(self) -> str:
         """Use our RDT protocol to receive data"""
         received_data: list[tuple[str, str]] = self.rdt.recv_fsm(self.transport)
-
         # For now, just return our data as a string
         return ''.join([r[1] for r in received_data])
 

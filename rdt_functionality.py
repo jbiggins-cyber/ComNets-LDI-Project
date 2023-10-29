@@ -56,7 +56,7 @@ def __verifyUDPChecksumBits(unicodeBits: list, checksum: list):
     # Returns 1 otherwise.
 
     localChecksum = checksum[:]
-    verify = __generateUDPChecksumBits(unicodeBits + checksum)
+    verify = __generateUDPChecksumBits(unicodeBits + localChecksum)
 
     for bit in verify:
         if (bit == '1'):

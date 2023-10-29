@@ -11,7 +11,7 @@ class RDTProtocolStrategy():
     FLAGS = {"ACK": 0x01, "FIN": 0x02, "NACK": 0x04}
     N_FLAG_HEXS  = 2
     N_SEQ_DIGITS = 4
-    N_CHECKSUM_CHARS = 7
+    N_CHECKSUM_CHARS = 8
     PACKET_DATA_LEN = 20 # bytes -- todo change
     RECV_TIMEOUT = 2 # seconds
 
@@ -174,7 +174,7 @@ class RDTProtocol_v1(RDTProtocolStrategy):
 
             if more_data[0] or remaining_timeout > 0:
 
-                # getting here mean we've received data
+                # getting here means we've received data
                 # print('more to receive')
 
                 recv_buffer = socket.receive()
@@ -203,7 +203,6 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
             while True:
                 receipt: str = socket.receive()
                 header, data = self._extract(receipt)
-                print(header)
 
                 # if this condition hits, we have successful ACK
                 if header["flags"] & self.FLAGS["ACK"]:
@@ -222,9 +221,9 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
             receipt = socket.receive()
             header, data = self._extract(receipt)
             print(list(header["check"]))
-            checksum = rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
+            checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
 
-            # because this is RDT2.0, we make the assumption that the ACK is no affected by corruption
+            # because this is RDT2.0, we make the assumption that the ACK is not affected by corruption
             if checksum_valid:
                 received_data_buffer.append((header, data))
                 header["flags"] = self.FLAGS["ACK"]
@@ -236,7 +235,8 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
             if not have_received_data:
                 expected_packets = int(header["total"])
                 have_received_data = True
-            return
+            if len(received_data_buffer) == expected_packets:
+                return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
 
 
 class RDTProtocol_v2_1(RDTProtocolStrategy):
