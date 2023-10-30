@@ -16,7 +16,7 @@ if (len(sys.argv) < NUM_ARGS):
 SOCK_TYPE = sys.argv[1]
 
 try:
-    m = messenger.ClientMessenger(sock_type=SOCK_TYPE, ip='localhost', rdt=RDTFactory.create("2.0"))
+    m = messenger.ClientMessenger(sock_type=SOCK_TYPE, ip='localhost', rdt=RDTFactory.create("2.1"))
 
     print("Successfully started " + m.sock_type + " client")
 
