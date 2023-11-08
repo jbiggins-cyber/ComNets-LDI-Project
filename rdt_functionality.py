@@ -56,19 +56,20 @@ def __verifyUDPChecksumBits(unicodeBits: list, checksum: list):
     # Returns 1 otherwise.
 
     localChecksum = checksum[:]
-    verify = __generateUDPChecksumBits(unicodeBits + checksum)
+    verify = __generateUDPChecksumBits(unicodeBits + localChecksum)
 
     for bit in verify:
         if (bit == '1'):
             return 1
     return 0
 
-def generate2DParityCheck(unicodeBits: list):
-    # This function takes a unicode list of bit characters,
+def generate2DParityCheck(msg: bytearray()):
+    # This function takes a bytearray() message,
     # forms it into an array and returns a 2D parity check 
     # as a list of bit integers.
 
     # Initialising 
+    unicodeBits = bytes2Bin(msg)
     numBytes = len(unicodeBits) // BYTE_SIZE
     bytes2DArray = np.empty((numBytes, BYTE_SIZE))
     bitSum = 0
@@ -80,9 +81,9 @@ def generate2DParityCheck(unicodeBits: list):
             bytes2DArray[byteIdx, i] = int(unicodeBits[byteIdx*BYTE_SIZE + i])
 
     # Generating even parity bit for each row and column.
-
     # Iterating through all rows
-    for rowIdx in range((np.shape(bytes2DArray))[0]):
+
+    for rowIdx in range(numBytes):
         bitSum = np.sum(bytes2DArray[rowIdx, :])
         if __isEven(bitSum):
             parityList.append(0)
@@ -90,28 +91,29 @@ def generate2DParityCheck(unicodeBits: list):
             parityList.append(1)
             
     # Iterating through all columns
-    for colIdx in range((np.shape(bytes2DArray)[1])):
+    for colIdx in range(BYTE_SIZE):
         bitSum = np.sum(bytes2DArray[:, colIdx])
         if __isEven(bitSum):
             parityList.append(0)
         else:
             parityList.append(1)
+
     return parityList
 
-def verify2DParityCheck(unicodeBits: list, sndrParityBits: list):
-    # Takes a unicode list of bit characters and a parity list
+def verify2DParityCheck(msg: bytearray(), sndrParityBits: list):
+    # Takes a bytearray() message and a parity list
     # of bit integers. Corrects up to 1 bit error, 
     # and verifies whether the data is corrupted or not.
-    # Returns the corrected unicode bits and false if the check succeeds,
-    # an empty list and true if the payload is corrupt and cannot be corrected.
+    # Returns the corrected bytearray() message and false if the check succeeds,
+    # an None and true if the payload is corrupt and cannot be corrected.
 
     # Note: 2D parity check can only detect up to 2 bit errors.
 
     # Initialising
-    localUnicodeBits = unicodeBits[:]
+    unicodeBits = bytes2Bin(msg)
     numRows = len(sndrParityBits) - BYTE_SIZE
     numCols = BYTE_SIZE
-    recvParityBits = generate2DParityCheck(localUnicodeBits)
+    recvParityBits = generate2DParityCheck(msg)
     rowErrorIdx = None
     colErrorIdx = None
 
@@ -121,8 +123,7 @@ def verify2DParityCheck(unicodeBits: list, sndrParityBits: list):
             if rowErrorIdx == None:
                 rowErrorIdx = rowIdx
             else:
-                print("More than 1 bit error detected, 2D parity check failed!\n")
-                return [], FAIL
+                return None, FAIL
             
     # Verifying column parity
     for colIdx in range(numCols):
@@ -130,45 +131,21 @@ def verify2DParityCheck(unicodeBits: list, sndrParityBits: list):
             if colErrorIdx == None:
                 colErrorIdx = colIdx
             else:
-                print("More than 1 bit error detected, 2D parity check failed!\n") 
-                return [], FAIL
+                return None, FAIL
 
     # Correcting errors
-    if ((rowErrorIdx == None) and (colErrorIdx != None)) \
-        or ((rowErrorIdx != None) and (colErrorIdx == None)):
-        print("More than 1 bit error detected, 2D parity check failed!\n") 
-        return [], FAIL
+    if ((rowErrorIdx == None) and (colErrorIdx != None)) or ((rowErrorIdx != None) and (colErrorIdx == None)):
+        return None, FAIL
     elif (rowErrorIdx != None) and (colErrorIdx != None):
-        if localUnicodeBits[rowErrorIdx*BYTE_SIZE + colErrorIdx] == '1':
-            localUnicodeBits[rowErrorIdx*BYTE_SIZE + colErrorIdx] = '0'
+        if unicodeBits[rowErrorIdx*BYTE_SIZE + colErrorIdx] == '1':
+            unicodeBits[rowErrorIdx*BYTE_SIZE + colErrorIdx] = '0'
         else:
-            localUnicodeBits[rowErrorIdx*BYTE_SIZE + colErrorIdx] = '1'
+            unicodeBits[rowErrorIdx*BYTE_SIZE + colErrorIdx] = '1'
 
-    # Checking if there were hidden bit errors (repeat the 2D parity check one more time)
-    recvParityBits = generate2DParityCheck(localUnicodeBits)
-
-    # Verifying row parity
-    for rowIdx in range(numRows):
-        if sndrParityBits[rowIdx] != recvParityBits[rowIdx]:
-            if rowErrorIdx == None:
-                rowErrorIdx = rowIdx
-            else:
-                print("More than 1 bit error detected, 2D parity check failed!\n")
-                return [], FAIL
-            
-    # Verifying column parity
-    for colIdx in range(numCols):
-        if sndrParityBits[numRows+colIdx] != recvParityBits[numRows+colIdx]:
-            if colErrorIdx == None:
-                colErrorIdx = colIdx
-            else:
-                print("More than 1 bit error detected, 2D parity check failed!\n") 
-                return [], FAIL
-
-    return [localUnicodeBits, SUCCESS]
+    return bin2Bytes(unicodeBits), SUCCESS
 
 def __isEven(val: int):
-    if val % 2 == 0:
+    if (val % 2) == 0:
         return True
     else:
         return False
@@ -239,7 +216,7 @@ def __generateUDPChecksumBits(unicodeBits: list):
 
     return checksum
 
-def __generate2DParityCheck(unicodeBits: list):
+def __generate2DParityCheckBits(unicodeBits: list):
     # This function takes a unicode list of bit characters,
     # forms it into an array and adds a row and column
     # for even parity bits.
