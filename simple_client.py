@@ -36,7 +36,9 @@ try:
         if data == 'close':
             m.finish()
         else:
+            print("Sending...")
             m.send(data)
+            print("Waiting to receive...")
             r = m.receive()
 
             print("CLIENT: received [[" + r + "]]")

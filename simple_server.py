@@ -35,6 +35,7 @@ try:
 
         # exchange messages on this connection
         while True:
+            print("Waiting to receive...")
             d = m.receive()
             print("SERVER: received <<" + d + ">>")
             if d == "FINMSG" or d == "":
@@ -46,6 +47,7 @@ try:
                 pass
             # actual ack should be handled in the layers below, this is just the server response
             else:
+                print("Sending...")
                 m.send('<<' + d + '>> rec\'d at ' + str(datetime.now()))
         # todo handle timeout
 

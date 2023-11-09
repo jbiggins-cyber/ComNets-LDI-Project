@@ -208,11 +208,14 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
                 header, data = self._extract(receipt)
 
                 # if this condition hits, we have successful ACK
-                if header["flags"] and self.FLAGS["ACK"]:
+                if header["flags"] & self.FLAGS["ACK"]:
+                    print("Received an ACK, " + ("done" if int(header["seq"]) == int(header["total"]) else "sending next packet"))
                     break
 
                 # if this condition hits, we need to re-request
-                if header["flags"] and self.FLAGS["NACK"]:
+                if header["flags"] & self.FLAGS["NACK"]:
+                    print("Received a NACK, retransmitting")
+                    socket.send(packet)
                     continue
         return
 
@@ -220,6 +223,9 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
         received_data_buffer = []
         have_received_data = False
         start_time = time.time()
+
+        # This flag lets us deterministically fail the first transmission
+        reject_first_time_flag = True
 
         while True:
 
@@ -232,17 +238,29 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
                 receipt = socket.receive()
                 header, data = self._extract(receipt)
                 
-                print(list(header["check"]))
+                # fail the first transmission
+                if reject_first_time_flag:
+                    reject_first_time_flag = False
+                    header["flags"] = self.FLAGS["NACK"]
+                    print(f"\033[31mNACKing packet #{header['seq']}\033[0m")
+                    socket.send(self._create_header(header))
+                    continue
+
+
+                # print(list(header["check"]))
                 checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
 
                 # because this is RDT2.0, we make the assumption that the ACK is not affected by corruption
                 if checksum_valid:
                     received_data_buffer.append((header, data))
                     header["flags"] = self.FLAGS["ACK"]
+                    print(f"ACKing packet #{header['seq']}")
                     socket.send(self._create_header(header))
                 elif not checksum_valid:
                     header["flags"] = self.FLAGS["NACK"]
+                    print(f"\033[31mNACKing packet #{header['seq']}\033[0m")
                     socket.send(self._create_header(header))
+                    continue
 
                 if not have_received_data:
                     expected_packets = int(header["total"])
@@ -323,7 +341,7 @@ class RDTProtocol_v2_1(RDTProtocol_v2_0):
             data_encoded, error_correction_valid = rdt_functionality.verify2DParityCheck(data.encode('utf-8'), [int(bitChar) for bitChar in header["error_correction"]])
             data = data_encoded.decode('utf-8')
 
-            # because this is RDT2.0, we make the assumption that the ACK is not affected by corruption
+            # because this is RDT2.1, we make the assumption that the ACK is not affected by corruption
             if error_correction_valid:
                 received_data_buffer.append((header, data))
                 header["flags"] = self.FLAGS["ACK"]
