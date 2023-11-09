@@ -20,6 +20,10 @@ parser.add_argument('--sock_type', choices=['udp', 'tcp'], default='udp',
                         help='Socket type (choose from: udp, tcp, default: udp)')
 parser.add_argument('--ip', default='localhost',
                         help='IP address (default: localhost)')
+parser.add_argument('--error_num', default=0,
+                        help='Number of random bit errors per message (default: 0)')
+parser.add_argument('--burst', default=0,
+                        help='Length of random burst error in every message (default: 0)')
 args = parser.parse_args()
 
 try:
