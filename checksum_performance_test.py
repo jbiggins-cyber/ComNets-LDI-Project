@@ -6,7 +6,7 @@ SAMPLE = "Hello, World! This is a test of the performance of checksum. :)"
 def checksumErrorDetectRate(byteMsg: bytearray(), numErrors: int):
     # This function takes a bytearray() message and the number of desired bit errors
     # as an integer.
-    # It creates a checksum, corrupts the message, then verifies it 10^5 times. 
+    # It creates a checksum, corrupts the message, then verifies it. 
     # Every message is corrupt and the function returns what percentage of the
     # corrupt messages are detected by UDP Checksum.
 

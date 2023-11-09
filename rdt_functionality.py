@@ -141,27 +141,6 @@ def verify2DParityCheck(msg: bytearray(), sndrParityBits: list):
             unicodeBits[rowErrorIdx*BYTE_SIZE + colErrorIdx] = '0'
         else:
             unicodeBits[rowErrorIdx*BYTE_SIZE + colErrorIdx] = '1'
-            
-    # Checking if there were hidden bit errors (repeat the 2D parity check one more time)
-    recvParityBits = generate2DParityCheck(bin2Bytes(unicodeBits))
-
-    # Verifying row parity
-    for rowIdx in range(numRows):
-        if sndrParityBits[rowIdx] != recvParityBits[rowIdx]:
-            if rowErrorIdx == None:
-                rowErrorIdx = rowIdx
-            else:
-                print("More than 1 bit error detected, 2D parity check failed!\n")
-                return None, FAIL
-            
-    # Verifying column parity
-    for colIdx in range(numCols):
-        if sndrParityBits[numRows+colIdx] != recvParityBits[numRows+colIdx]:
-            if colErrorIdx == None:
-                colErrorIdx = colIdx
-            else:
-                print("More than 1 bit error detected, 2D parity check failed!\n") 
-                return None, FAIL
 
     return bin2Bytes(unicodeBits), SUCCESS
 
