@@ -6,21 +6,30 @@ This should start before the client so a binding is created
 """
 
 from datetime import datetime
-import messenger
 import sys
+import argparse
 
+import messenger
 from rdt_protocol import RDTFactory
 
-NUM_ARGS = 2
-if (len(sys.argv) < NUM_ARGS):
-    raise IndexError("Not enough input arguments specified!\n\n"\
-                     "Please enter: python simple_server.py socket_type")
-SOCK_TYPE = sys.argv[1]
+parser = argparse.ArgumentParser(
+    description="""This script runs the server side of the communications. This should start before the client so a binding is created.""")
+parser.add_argument('rdt_ver', choices=['1.0', '2.0', '2.1', '2.2', '3.0'],
+                        help='RDT version (choose from: 1.0, 2.0, 2.1, 2.2, 3.0)')
+parser.add_argument('--sock_type', choices=['udp', 'tcp'], default='udp',
+                        help='Socket type (choose from: udp, tcp, default: udp)')
+parser.add_argument('--ip', default='localhost',
+                        help='IP address (default: localhost)')
+parser.add_argument('--error_num', default=0,
+                        help='Number of random bit errors per message (default: 0)')
+parser.add_argument('--burst', default=0,
+                        help='Length of random burst error in every message (default: 0)')
+args = parser.parse_args()
 
 try:
     # make any number of connections until termination
     while True:
-        m = messenger.ServerMessenger(sock_type=SOCK_TYPE, ip='localhost', rdt=RDTFactory.create("2.1"))
+        m = messenger.ServerMessenger(sock_type=args.sock_type, ip=args.ip, rdt=RDTFactory.create(args.rdt_ver))
 
         print("Successfully started " + m.sock_type + " server")
 
