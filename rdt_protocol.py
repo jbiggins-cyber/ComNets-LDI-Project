@@ -201,43 +201,54 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
         print("MSG: SEND: will send: \033[33m", packets_to_send, '\033[0m')
         for packet in packets_to_send:
             socket.send(packet)
+            if data == "FINMSG":
+                return
             while True:
                 receipt: str = socket.receive()
                 header, data = self._extract(receipt)
 
                 # if this condition hits, we have successful ACK
-                if header["flags"] & self.FLAGS["ACK"]:
+                if header["flags"] and self.FLAGS["ACK"]:
                     break
 
                 # if this condition hits, we need to re-request
-                if header["flags"] & self.FLAGS["NACK"]:
+                if header["flags"] and self.FLAGS["NACK"]:
                     continue
         return
 
     def recv_fsm(self, socket: GenericSocket) -> list[tuple[str, str]]:
         received_data_buffer = []
         have_received_data = False
+        start_time = time.time()
 
         while True:
-            receipt = socket.receive()
-            header, data = self._extract(receipt)
-            print(list(header["check"]))
-            checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
 
-            # because this is RDT2.0, we make the assumption that the ACK is not affected by corruption
-            if checksum_valid:
-                received_data_buffer.append((header, data))
-                header["flags"] = self.FLAGS["ACK"]
-                socket.send(self._create_header(header))
-            elif not checksum_valid:
-                header["flags"] = self.FLAGS["NACK"]
-                socket.send(self._create_header(header))
+            time.sleep(1)
+            remaining_timeout = self.RECV_TIMEOUT - (time.time() - start_time)
+            more_data = select.select([socket.sock], [], [], self.RECV_TIMEOUT)
 
-            if not have_received_data:
-                expected_packets = int(header["total"])
-                have_received_data = True
-            if len(received_data_buffer) == expected_packets:
-                return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
+            if more_data[0] or remaining_timeout > 0:
+
+                receipt = socket.receive()
+                header, data = self._extract(receipt)
+                
+                print(list(header["check"]))
+                checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
+
+                # because this is RDT2.0, we make the assumption that the ACK is not affected by corruption
+                if checksum_valid:
+                    received_data_buffer.append((header, data))
+                    header["flags"] = self.FLAGS["ACK"]
+                    socket.send(self._create_header(header))
+                elif not checksum_valid:
+                    header["flags"] = self.FLAGS["NACK"]
+                    socket.send(self._create_header(header))
+
+                if not have_received_data:
+                    expected_packets = int(header["total"])
+                    have_received_data = True
+                if len(received_data_buffer) == expected_packets:
+                    return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
 
 
 class RDTProtocol_v2_1(RDTProtocol_v2_0):
