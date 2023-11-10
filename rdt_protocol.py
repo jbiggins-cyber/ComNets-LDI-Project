@@ -1,10 +1,13 @@
 import select
 import time
 from math import ceil
+from random import randint
 
 from transport import *
 import rdt_functionality
 from transport import GenericSocket
+
+REJECT_FIRST_TIME_FLAG = False
 
 class RDTProtocolStrategy():
     """Different protocols use the Strategy pattern"""
@@ -196,6 +199,33 @@ class RDTProtocol_v1(RDTProtocolStrategy):
 
 class RDTProtocol_v2_0(RDTProtocolStrategy):
 
+    def _split_data_into_packets(self, data: str, flags: int = 0x00) -> list[str]:
+        """
+        Split up a message by size
+        This does the make_pkt() functionality
+        """
+        packet_list = []
+        n_packets = ceil(len(data) / self.PACKET_DATA_LEN)
+
+        for i in range(n_packets):
+            data_idx = i*self.PACKET_DATA_LEN
+            next_data = data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
+
+            # seq = i+1 means that seq of last packet == total
+            checksum = ''.join(rdt_functionality.generateUDPChecksum(next_data.encode('utf-8')))
+
+            # corrupting message if it is not a close message based on probablity of corruption
+            if not (next_data == "FINMSG"):
+                if randint(0, 100) > args.error_prob:
+                    next_data = (rdt_functionality.corrupt(next_data.encode('utf-8')), args.error_num).decode('utf-8')
+
+            header_params = {"seq": i+1, "total": n_packets, "flags": flags, "check": checksum}
+            header = self._create_header(header_params)
+            next_packet = header + '\n' + next_data
+            packet_list.append(next_packet)
+
+        return packet_list
+
     def send_fsm(self, socket: GenericSocket, data: str):
         packets_to_send: list[str] = self._split_data_into_packets(data)
         print("MSG: SEND: will send: \033[33m", packets_to_send, '\033[0m')
@@ -222,51 +252,43 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
     def recv_fsm(self, socket: GenericSocket) -> list[tuple[str, str]]:
         received_data_buffer = []
         have_received_data = False
-        start_time = time.time()
 
         # This flag lets us deterministically fail the first transmission
-        reject_first_time_flag = True
+        reject_first_time_flag = REJECT_FIRST_TIME_FLAG
 
         while True:
-
-            time.sleep(1)
-            remaining_timeout = self.RECV_TIMEOUT - (time.time() - start_time)
-            more_data = select.select([socket.sock], [], [], self.RECV_TIMEOUT)
-
-            if more_data[0] or remaining_timeout > 0:
-
-                receipt = socket.receive()
-                header, data = self._extract(receipt)
-                
-                # fail the first transmission
-                if reject_first_time_flag:
-                    reject_first_time_flag = False
-                    header["flags"] = self.FLAGS["NACK"]
-                    print(f"\033[31mNACKing packet #{header['seq']}\033[0m")
-                    socket.send(self._create_header(header))
-                    continue
+            receipt = socket.receive()
+            header, data = self._extract(receipt)
+            
+            # fail the first transmission
+            if reject_first_time_flag:
+                reject_first_time_flag = False
+                header["flags"] = self.FLAGS["NACK"]
+                print(f"\033[31mNACKing packet #{header['seq']}\033[0m")
+                socket.send(self._create_header(header))
+                continue
 
 
-                # print(list(header["check"]))
-                checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
+            # print(list(header["check"]))
+            checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
 
-                # because this is RDT2.0, we make the assumption that the ACK is not affected by corruption
-                if checksum_valid:
-                    received_data_buffer.append((header, data))
-                    header["flags"] = self.FLAGS["ACK"]
-                    print(f"ACKing packet #{header['seq']}")
-                    socket.send(self._create_header(header))
-                elif not checksum_valid:
-                    header["flags"] = self.FLAGS["NACK"]
-                    print(f"\033[31mNACKing packet #{header['seq']}\033[0m")
-                    socket.send(self._create_header(header))
-                    continue
+            # because this is RDT2.0, we make the assumption that the ACK is not affected by corruption
+            if checksum_valid:
+                received_data_buffer.append((header, data))
+                header["flags"] = self.FLAGS["ACK"]
+                print(f"ACKing packet #{header['seq']}")
+                socket.send(self._create_header(header))
+            elif not checksum_valid:
+                header["flags"] = self.FLAGS["NACK"]
+                print(f"\033[31mNACKing packet #{header['seq']}\033[0m")
+                socket.send(self._create_header(header))
+                continue
 
-                if not have_received_data:
-                    expected_packets = int(header["total"])
-                    have_received_data = True
-                if len(received_data_buffer) == expected_packets:
-                    return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
+            if not have_received_data:
+                expected_packets = int(header["total"])
+                have_received_data = True
+            if len(received_data_buffer) == expected_packets:
+                return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
 
 
 class RDTProtocol_v2_1(RDTProtocol_v2_0):
