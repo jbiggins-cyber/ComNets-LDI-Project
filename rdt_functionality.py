@@ -199,7 +199,7 @@ def __corruptBits(unicodeBits: list, numCorrupts: int):
     # and returns the corrupted list of bit characters.
 
     corruptedUnicode = unicodeBits[:]
-    corruptIdxs = random.sample(range(0, len(corruptedUnicode)), numCorrupts)
+    corruptIdxs = random.sample(range(0, len(corruptedUnicode)), min(numCorrupts, len(corruptedUnicode)))
     for corruptIdx in corruptIdxs:
         if corruptedUnicode[corruptIdx] == '0':
             corruptedUnicode[corruptIdx] = '1'
