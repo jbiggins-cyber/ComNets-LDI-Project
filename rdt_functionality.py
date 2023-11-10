@@ -9,6 +9,21 @@ SEED =              1083430
 FAIL =              True
 SUCCESS =           False
 
+def corruptPkt(msg: str, numCorrupts: int, error_prob: int):
+    # This function takes a message string of a packet which contains a header
+    # and a payload, the number of bits of the payload that should be corrupted, 
+    # and the probability of corruption. It separates the information and the 
+    # payload, uses the corrupt() function to corrupt the payload and returns 
+    # a new message string with the header and corrupted payload.
+
+    if random.randint(0,100) < error_prob:
+        [header, payload] = msg.split('\n', 1)
+        corruptPayload = (corrupt(payload.encode('utf-8'), numCorrupts))
+        corruptPkt = header + '\n' + str(corruptPayload).strip("b'")
+        return corruptPkt
+    else:
+        return msg
+
 def corrupt(msg: bytearray(), numCorrupts: int):
     # This function takes a message bytearray() and number of bits the user wants to corrupt.
     # It uses Python's "Random" module to randomly choose bits to flip,

@@ -1,7 +1,6 @@
 import select
 import time
 from math import ceil
-from random import randint
 
 from transport import *
 import rdt_functionality
@@ -201,40 +200,18 @@ class RDTProtocol_v1(RDTProtocolStrategy):
 
 class RDTProtocol_v2_0(RDTProtocolStrategy):
 
-    def _split_data_into_packets(self, data: str, flags: int = 0x00) -> list[str]:
-        """
-        Split up a message by size
-        This does the make_pkt() functionality
-        """
-        packet_list = []
-        n_packets = ceil(len(data) / self.PACKET_DATA_LEN)
-
-        for i in range(n_packets):
-            data_idx = i*self.PACKET_DATA_LEN
-            next_data = data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
-
-            # seq = i+1 means that seq of last packet == total
-            checksum = ''.join(rdt_functionality.generateUDPChecksum(next_data.encode('utf-8')))
-
-            # corrupting message if it is not a close message based on probablity of corruption
-            if not (next_data == "FINMSG"):
-                if randint(0, 100) < self.error_prob:
-                    next_data = (rdt_functionality.corrupt(next_data.encode('utf-8'), self.error_num)).decode('utf-8')
-
-            header_params = {"seq": i+1, "total": n_packets, "flags": flags, "check": checksum}
-            header = self._create_header(header_params)
-            next_packet = header + '\n' + next_data
-            packet_list.append(next_packet)
-
-        return packet_list
-
     def send_fsm(self, socket: GenericSocket, data: str):
         packets_to_send: list[str] = self._split_data_into_packets(data)
         print("MSG: SEND: will send: \033[33m", packets_to_send, '\033[0m')
         for packet in packets_to_send:
-            socket.send(packet)
+            
             if data == "FINMSG":
+                socket.send(packet)
                 return
+            else:
+                corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob)
+                socket.send(corruptPkt)
+
             while True:
                 receipt: str = socket.receive()
                 header, data = self._extract(receipt)
@@ -247,7 +224,8 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
                 # if this condition hits, we need to re-request
                 if header["flags"] & self.FLAGS["NACK"]:
                     print("Received a NACK, retransmitting")
-                    socket.send(packet)
+                    corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob)
+                    socket.send(corruptPkt)
                     continue
         return
 
