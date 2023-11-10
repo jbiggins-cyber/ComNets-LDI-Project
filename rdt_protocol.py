@@ -20,8 +20,10 @@ class RDTProtocolStrategy():
     N_ERROR_CORRECTION_CHARS = (PACKET_DATA_LEN + 1) * rdt_functionality.BYTE_SIZE
     RECV_TIMEOUT = 2 # seconds
 
-    def __init__(self):
-        pass
+    def __init__(self, error_prob: float, error_num: int, burst: int):
+        self.error_prob = error_prob
+        self.error_num = error_num
+        self.burst = burst
 
     def send_fsm(self, socket: GenericSocket, data: str):
         """
@@ -130,17 +132,17 @@ class RDTProtocolStrategy():
 class RDTFactory():
     """Get the management class corresponding to a particular RDT version"""
     @staticmethod
-    def create(rdt_ver: str) -> RDTProtocolStrategy:
+    def create(rdt_ver: str, error_prob: float, error_num: int, burst: int) -> RDTProtocolStrategy:
         if rdt_ver == '1.0':
-            return RDTProtocol_v1()
+            return RDTProtocol_v1(error_prob, error_num, burst)
         elif rdt_ver == '2.0':
-            return RDTProtocol_v2_0()
+            return RDTProtocol_v2_0(error_prob, error_num, burst)
         elif rdt_ver == '2.1':
-            return RDTProtocol_v2_1()
+            return RDTProtocol_v2_1(error_prob, error_num, burst)
         elif rdt_ver == '2.2':
-            return RDTProtocol_v2_2()
+            return RDTProtocol_v2_2(error_prob, error_num, burst)
         elif rdt_ver == '3.0':
-            return RDTProtocol_v3()
+            return RDTProtocol_v3(error_prob, error_num, burst)
         else:
             raise ValueError("Invalid RDT version")
 
@@ -216,8 +218,8 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
 
             # corrupting message if it is not a close message based on probablity of corruption
             if not (next_data == "FINMSG"):
-                if randint(0, 100) > args.error_prob:
-                    next_data = (rdt_functionality.corrupt(next_data.encode('utf-8')), args.error_num).decode('utf-8')
+                if randint(0, 100) < self.error_prob:
+                    next_data = (rdt_functionality.corrupt(next_data.encode('utf-8'), self.error_num)).decode('utf-8')
 
             header_params = {"seq": i+1, "total": n_packets, "flags": flags, "check": checksum}
             header = self._create_header(header_params)
