@@ -9,16 +9,21 @@ SEED =              1083430
 FAIL =              True
 SUCCESS =           False
 
-def corruptPkt(msg: str, numCorrupts: int, error_prob: int):
+def corruptPkt(msg: str, numCorrupts=0, error_prob=0, burst=0):
     # This function takes a message string of a packet which contains a header
     # and a payload, the number of bits of the payload that should be corrupted, 
-    # and the probability of corruption. It separates the information and the 
+    # the probability of corruption, and the length of the burst error if
+    # the corruption should be a burst error instead of random bit errors. 
+    # It separates the information and the 
     # payload, uses the corrupt() function to corrupt the payload and returns 
     # a new message string with the header and corrupted payload.
 
     if random.randint(0,100) < error_prob:
         [header, payload] = msg.split('\n', 1)
-        corruptPayload = (corrupt(payload.encode('utf-8'), numCorrupts))
+        if not burst:
+            corruptPayload = corrupt(payload.encode('utf-8'), numCorrupts)
+        else:
+            corruptPayload = burstError(payload.encode('utf-8'), burst)
         corruptPkt = header + '\n' + str(corruptPayload).strip("b'")
         return corruptPkt
     else:
@@ -173,8 +178,15 @@ def __burstErrorBits(unicodeBits: list, burstLength: int):
     # and returns the corrupted list of bit characters.
 
     corruptedUnicode = unicodeBits[:]
-    initialCorrupt = random.randrange(0, len(corruptedUnicode)-burstLength)
-    for i in range(initialCorrupt, initialCorrupt+burstLength):
+
+    # stops trying to corrupt bits that are out of range
+    if burstLength > len(corruptedUnicode):
+        initialCorrupt = 0
+
+    else:
+        initialCorrupt = random.randrange(0, len(corruptedUnicode)-burstLength)
+
+    for i in range(initialCorrupt, min(initialCorrupt+burstLength, len(corruptedUnicode))):
         if corruptedUnicode[i] == '0':
             corruptedUnicode[i] = '1'
         else:

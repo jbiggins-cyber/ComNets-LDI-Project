@@ -209,7 +209,7 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
                 socket.send(packet)
                 return
             else:
-                corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob)
+                corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
                 socket.send(corruptPkt)
 
             while True:
@@ -224,7 +224,7 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
                 # if this condition hits, we need to re-request
                 if header["flags"] & self.FLAGS["NACK"]:
                     print("Received a NACK, retransmitting")
-                    corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob)
+                    corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
                     socket.send(corruptPkt)
                     continue
         return
