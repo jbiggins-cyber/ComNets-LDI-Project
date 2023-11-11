@@ -12,11 +12,12 @@ class RDTProtocolStrategy():
     """Different protocols use the Strategy pattern"""
 
     FLAGS = {"ACK": 0x01, "FIN": 0x02, "NACK": 0x04}
-    PACKET_DATA_LEN = 20 # bytes -- todo change
+    PACKET_DATA_LEN = 20 # bytes (needs to be at least 3 bytes so ACK or NAK is in one packet)
     N_FLAG_HEXS  = 2
     N_SEQ_DIGITS = 4
     N_CHECKSUM_CHARS = rdt_functionality.BYTE_SIZE
     N_ERROR_CORRECTION_CHARS = (PACKET_DATA_LEN + 1) * rdt_functionality.BYTE_SIZE
+    N_PKT_NUM_DIGITS = 1
     RECV_TIMEOUT = 2 # seconds
 
     def __init__(self, error_prob: float, error_num: int, burst: int):
@@ -286,8 +287,9 @@ class RDTProtocol_v2_1(RDTProtocol_v2_0):
             next_data = data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
 
             # seq = i+1 means that seq of last packet == total
-            error_correction_code = ''.join(map(str, rdt_functionality.generate2DParityCheck(next_data.encode('utf-8'))))
-            header_params = {"seq": i+1, "total": n_packets, "flags": flags, "error_correction": error_correction_code}
+            checksum = ''.join(rdt_functionality.generateUDPChecksum(next_data.encode('utf-8')))
+            pkt_num = i % 2
+            header_params = {"seq": i+1, "total": n_packets, "flags": flags, "check": checksum, "pkt_num": pkt_num}
             header = self._create_header(header_params)
             next_packet = header + '\n' + next_data
             packet_list.append(next_packet)
@@ -305,11 +307,14 @@ class RDTProtocol_v2_1(RDTProtocol_v2_0):
         i = header.index('F:')
         flags = int(header[i+len('F:'):i+self.N_FLAG_HEXS+len('F:')])
 
-        i = header.index('EC:')
-        error_correction_code = header[i+len('EC:'):i+self.N_ERROR_CORRECTION_CHARS+len('EC:')]
+        i = header.index('C:')
+        checksum = header[i+len('C:'):i+self.N_CHECKSUM_CHARS+len('C:')]
 
-        return {"seq": seq_num, "total": total, "flags": flags, "error_correction": error_correction_code}
-    
+        i = header.index('N:')
+        pkt_num = header[i+len('N:'):i+self.N_PKT_NUM_DIGITS+len('N:')]
+
+        return {"seq": seq_num, "total": total, "flags": flags, "check": checksum, "pkt_num": pkt_num}
+
     def _create_header(self, params: dict[str, any]) -> str:
         """
         Create the procotol header for given params
@@ -328,29 +333,86 @@ class RDTProtocol_v2_1(RDTProtocol_v2_0):
             raise ValueError("Missing flags (key: 'flags')")
         if not (0x00 <= params["flags"] <= 0xFF):
             raise ValueError(f"Flags out of range: {params['flags']}")
-        if not 'error_correction' in params:
-            raise ValueError("Missing error correction code (key: 'error_correction')")
-        return f"HEADER S:{params['seq']:04d} T:{params['total']:04d} F:{params['flags']:02x} EC:{params['error_correction'][0:self.N_ERROR_CORRECTION_CHARS]}"
+        if not 'check' in params:
+            raise ValueError("Missing checksum (key: 'check')")
+        if not 'pkt_num' in params:
+            raise ValueError("Missing packet number (key: 'pkt_num)")
+        return f"HEADER S:{params['seq']:04d} T:{params['total']:04d} F:{params['flags']:02x} C:{params['check'][0:self.N_CHECKSUM_CHARS]} N:{params['pkt_num']:01d}"
 
+    def send_fsm(self, socket: GenericSocket, data: str):
+        packets_to_send: list[str] = self._split_data_into_packets(data)
+        print("MSG: SEND: will send: \033[33m", packets_to_send, '\033[0m')
+
+        for packet in packets_to_send:
+            
+            # always send close messages without corrupting them
+            if data == "FINMSG":
+                socket.send(packet)
+                return
+            
+            # call to send pkt 0
+            else:
+                corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
+                socket.send(corruptPkt)
+
+            # wait for ACK or NAK
+            while True:
+                receipt: str = socket.receive()
+                header, data = self._extract(receipt)
+
+                # if this condition hits, we have successful ACK
+                if data == "ACK":
+                    print("Received an ACK, " + ("done" if int(header["seq"]) == int(header["total"]) else "sending next packet"))
+                    break
+
+                # if this condition hits, we have successful NAK => need to re-request
+                elif data == "NACK":
+                    print("Received a NAK, re-sending packet")
+                    corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
+                    socket.send(corruptPkt)
+                    continue
+
+                # if this condition hits, we have garbled ACK/NAK => need to re-request
+                else:
+                    print("ACK/NAK was garbled, re-sending packet")
+                    corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
+                    socket.send(corruptPkt)
+                    continue
+        return
+    
     def recv_fsm(self, socket: GenericSocket) -> list[tuple[str, str]]:
         received_data_buffer = []
         have_received_data = False
 
+        recvSeqNum = 0      # receiver sequence number
         while True:
             receipt = socket.receive()
             header, data = self._extract(receipt)
-            print(list(header["error_correction"]))
-            data_encoded, error_correction_valid = rdt_functionality.verify2DParityCheck(data.encode('utf-8'), [int(bitChar) for bitChar in header["error_correction"]])
-            data = data_encoded.decode('utf-8')
 
-            # because this is RDT2.1, we make the assumption that the ACK is not affected by corruption
-            if error_correction_valid:
+            # checking FINMSG
+            if data == "FINMSG":
+                return [(header, data)]
+
+            # checking corrupt
+            checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
+            # send NAK if corrupt
+            if not checksum_valid:
+                [packet] = self._split_data_into_packets("NAK")
+
+            # checking sequence number
+            elif header["pkt_num"] == recvSeqNum:
+                # send ACK if correct sequence number, then update sequence number
                 received_data_buffer.append((header, data))
-                header["flags"] = self.FLAGS["ACK"]
-                socket.send(self._create_header(header))
-            elif not error_correction_valid:
-                header["flags"] = self.FLAGS["NACK"]
-                socket.send(self._create_header(header))
+                [packet] = self._split_data_into_packets("ACK")
+                recvSeqNum = recvSeqNum ^ 1
+
+            # wrong sequence number, need to re-send ACK
+            else:
+                [packet] = self._split_data_into_packets("ACK")
+            
+            # sending ACK or NAK
+            corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
+            socket.send(corruptPkt)
 
             if not have_received_data:
                 expected_packets = int(header["total"])

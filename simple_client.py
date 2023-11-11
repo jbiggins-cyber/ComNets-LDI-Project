@@ -36,15 +36,24 @@ try:
     # exchange messages on this connection
     while True:
         data = input()
-        if data == 'close':
-            m.finish()
-        else:
-            print("Sending...")
-            m.send(data)
-            print("Waiting to receive...")
-            r = m.receive()
 
-            print("CLIENT: received [[" + r + "]]")
+        if args.rdt_ver=='2.1':
+            if data == 'close':
+                m.finish()
+            else:
+                print("Sending...")
+                m.send(data)
+            
+        else:
+            if data == 'close':
+                m.finish()
+            else:
+                print("Sending...")
+                m.send(data)
+                print("Waiting to receive...")
+                r = m.receive()
+
+                print("CLIENT: received [[" + r + "]]")
 
     # todo handle timeout
     m.finish()
