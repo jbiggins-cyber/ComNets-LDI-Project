@@ -36,6 +36,7 @@ try:
     # exchange messages on this connection
     while True:
         data = input()
+
         if data == 'close':
             m.finish()
         else:
