@@ -6,6 +6,8 @@ from transport import *
 import rdt_functionality
 from transport import GenericSocket
 
+REJECT_FIRST_TIME_FLAG = False
+
 class RDTProtocolStrategy():
     """Different protocols use the Strategy pattern"""
 
@@ -17,8 +19,10 @@ class RDTProtocolStrategy():
     N_ERROR_CORRECTION_CHARS = (PACKET_DATA_LEN + 1) * rdt_functionality.BYTE_SIZE
     RECV_TIMEOUT = 2 # seconds
 
-    def __init__(self):
-        pass
+    def __init__(self, error_prob: float, error_num: int, burst: int):
+        self.error_prob = error_prob
+        self.error_num = error_num
+        self.burst = burst
 
     def send_fsm(self, socket: GenericSocket, data: str):
         """
@@ -127,17 +131,17 @@ class RDTProtocolStrategy():
 class RDTFactory():
     """Get the management class corresponding to a particular RDT version"""
     @staticmethod
-    def create(rdt_ver: str) -> RDTProtocolStrategy:
+    def create(rdt_ver: str, error_prob: float, error_num: int, burst: int) -> RDTProtocolStrategy:
         if rdt_ver == '1.0':
-            return RDTProtocol_v1()
+            return RDTProtocol_v1(error_prob, error_num, burst)
         elif rdt_ver == '2.0':
-            return RDTProtocol_v2_0()
+            return RDTProtocol_v2_0(error_prob, error_num, burst)
         elif rdt_ver == '2.1':
-            return RDTProtocol_v2_1()
+            return RDTProtocol_v2_1(error_prob, error_num, burst)
         elif rdt_ver == '2.2':
-            return RDTProtocol_v2_2()
+            return RDTProtocol_v2_2(error_prob, error_num, burst)
         elif rdt_ver == '3.0':
-            return RDTProtocol_v3()
+            return RDTProtocol_v3(error_prob, error_num, burst)
         else:
             raise ValueError("Invalid RDT version")
 
@@ -200,9 +204,14 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
         packets_to_send: list[str] = self._split_data_into_packets(data)
         print("MSG: SEND: will send: \033[33m", packets_to_send, '\033[0m')
         for packet in packets_to_send:
-            socket.send(packet)
+            
             if data == "FINMSG":
+                socket.send(packet)
                 return
+            else:
+                corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
+                socket.send(corruptPkt)
+
             while True:
                 receipt: str = socket.receive()
                 header, data = self._extract(receipt)
@@ -215,58 +224,51 @@ class RDTProtocol_v2_0(RDTProtocolStrategy):
                 # if this condition hits, we need to re-request
                 if header["flags"] & self.FLAGS["NACK"]:
                     print("Received a NACK, retransmitting")
-                    socket.send(packet)
+                    corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
+                    socket.send(corruptPkt)
                     continue
         return
 
     def recv_fsm(self, socket: GenericSocket) -> list[tuple[str, str]]:
         received_data_buffer = []
         have_received_data = False
-        start_time = time.time()
 
         # This flag lets us deterministically fail the first transmission
-        reject_first_time_flag = True
+        reject_first_time_flag = REJECT_FIRST_TIME_FLAG
 
         while True:
-
-            time.sleep(1)
-            remaining_timeout = self.RECV_TIMEOUT - (time.time() - start_time)
-            more_data = select.select([socket.sock], [], [], self.RECV_TIMEOUT)
-
-            if more_data[0] or remaining_timeout > 0:
-
-                receipt = socket.receive()
-                header, data = self._extract(receipt)
-                
-                # fail the first transmission
-                if reject_first_time_flag:
-                    reject_first_time_flag = False
-                    header["flags"] = self.FLAGS["NACK"]
-                    print(f"\033[31mNACKing packet #{header['seq']}\033[0m")
-                    socket.send(self._create_header(header))
-                    continue
+            receipt = socket.receive()
+            header, data = self._extract(receipt)
+            
+            # fail the first transmission
+            if reject_first_time_flag:
+                reject_first_time_flag = False
+                header["flags"] = self.FLAGS["NACK"]
+                print(f"\033[31mNACKing packet #{header['seq']}\033[0m")
+                socket.send(self._create_header(header))
+                continue
 
 
-                # print(list(header["check"]))
-                checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
+            # print(list(header["check"]))
+            checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
 
-                # because this is RDT2.0, we make the assumption that the ACK is not affected by corruption
-                if checksum_valid:
-                    received_data_buffer.append((header, data))
-                    header["flags"] = self.FLAGS["ACK"]
-                    print(f"ACKing packet #{header['seq']}")
-                    socket.send(self._create_header(header))
-                elif not checksum_valid:
-                    header["flags"] = self.FLAGS["NACK"]
-                    print(f"\033[31mNACKing packet #{header['seq']}\033[0m")
-                    socket.send(self._create_header(header))
-                    continue
+            # because this is RDT2.0, we make the assumption that the ACK is not affected by corruption
+            if checksum_valid:
+                received_data_buffer.append((header, data))
+                header["flags"] = self.FLAGS["ACK"]
+                print(f"ACKing packet #{header['seq']}")
+                socket.send(self._create_header(header))
+            elif not checksum_valid:
+                header["flags"] = self.FLAGS["NACK"]
+                print(f"\033[31mNACKing packet #{header['seq']}\033[0m")
+                socket.send(self._create_header(header))
+                continue
 
-                if not have_received_data:
-                    expected_packets = int(header["total"])
-                    have_received_data = True
-                if len(received_data_buffer) == expected_packets:
-                    return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
+            if not have_received_data:
+                expected_packets = int(header["total"])
+                have_received_data = True
+            if len(received_data_buffer) == expected_packets:
+                return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
 
 
 class RDTProtocol_v2_1(RDTProtocol_v2_0):
