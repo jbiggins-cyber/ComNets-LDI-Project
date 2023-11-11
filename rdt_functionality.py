@@ -18,7 +18,7 @@ def corruptPkt(msg: str, numCorrupts=0, error_prob=0, burst=0):
     # payload, uses the corrupt() function to corrupt the payload and returns 
     # a new message string with the header and corrupted payload.
 
-    if random.randint(0,100) < error_prob:
+    if random.randint(0,100) <= error_prob:
         [header, payload] = msg.split('\n', 1)
         if not burst:
             corruptPayload = corrupt(payload.encode('utf-8'), numCorrupts)
