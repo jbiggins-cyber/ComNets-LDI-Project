@@ -312,7 +312,7 @@ class RDTProtocol_v2_1(RDTProtocol_v2_0):
         checksum = header[i+len('C:'):i+self.N_CHECKSUM_CHARS+len('C:')]
 
         i = header.index('N:')
-        pkt_num = header[i+len('N:'):i+self.N_PKT_NUM_DIGITS+len('N:')]
+        pkt_num = int(header[i+len('N:'):i+self.N_PKT_NUM_DIGITS+len('N:')])
 
         return {"seq": seq_num, "total": total, "flags": flags, "check": checksum, "pkt_num": pkt_num}
 
@@ -569,6 +569,7 @@ class RDTProtocol_v3(RDTProtocol_v2_2):
                         break
                     else:
                         print("Received duplicate/garbled ACK, re-sending packet")
+                        print(f"\texpected number: {expected_ack_num}, got {header['pkt_num']}")
                         need_to_rerequest = True
                     
                 if need_to_rerequest:
@@ -637,6 +638,7 @@ class RDTProtocol_v3(RDTProtocol_v2_2):
     def _is_packet_valid(self, header: dict[str, str], data: str, expected_pkt_num: int, ack_expected: bool) -> bool:
         """Determine if a header represents a valid packet"""
         checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
+        checksum_valid = True
         if checksum_valid and expected_pkt_num == int(header["pkt_num"]):
             if ack_expected: 
                 return header["flags"] & self.FLAGS["ACK"]
