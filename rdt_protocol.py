@@ -550,14 +550,14 @@ class RDTProtocol_v3(RDTProtocolStrategy):
             # wait for ACK
             while True:
                 need_to_rerequest: bool = False 
-                readable, _, _ = select.select([socket.sock], [], [], self.RECV_TIMEOUT)
+                
+                # blocking receive on the socket
+                (timed_out, receipt) = self._receive_data_or_timeout(socket)
 
-                # check for timeout
-                if not readable:
+                if timed_out:
                     print("Timed out waiting for ACK, re-sending packet")
                     need_to_rerequest = True
                 else:
-                    receipt: str = socket.receive()
                     header, data = self._extract(receipt)
                     checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
 
@@ -579,6 +579,22 @@ class RDTProtocol_v3(RDTProtocolStrategy):
         return (header["flags"] & self.FLAGS["ACK"]) \
                 and checksum_valid \
                 and expected_ack_num == header["pkt_num"]
+
+    def _receive_data_or_timeout(self, socket: GenericSocket) -> tuple[bool, Union[None, str]]:
+        """
+        receive data on a link that might timeout
+        - returns a tuple. The first value is True for timeout, and False for data received
+        - If first value is True, then second value is None
+        - If first value is False, then second value the received data
+        """
+
+        readable, _, _ = select.select([socket.sock], [], [], self.RECV_TIMEOUT)
+
+        # check for timeout
+        if not readable:
+            return True, None
+        else:
+            return False, socket.receive()
 
     def recv_fsm(self, socket: GenericSocket) -> list[tuple[str, str]]:
         pass
