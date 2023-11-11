@@ -534,7 +534,7 @@ class RDTProtocol_v2_2(RDTProtocol_v2_1):
             corruptReply = rdt_functionality.corruptPkt(reply, self.error_num, self.error_prob, self.burst)
             socket.send(corruptReply)
 
-class RDTProtocol_v3(RDTProtocol_v2_0):
+class RDTProtocol_v3(RDTProtocol_v2_2):
     def send_fsm(self, socket: GenericSocket, data: str):
         packets_to_send: list[str] = self._split_data_into_packets(data)
         print("MSG: SEND: will send: \033[33m", packets_to_send, '\033[0m')
@@ -564,7 +564,7 @@ class RDTProtocol_v3(RDTProtocol_v2_0):
                     header, data = self._extract(receipt)
 
                     # if this condition hits, we have successful ACK
-                    if self._is_header_valid(header, expected_ack_num):
+                    if self._is_packet_valid(header, data, expected_ack_num, True):
                         print("Received an ACK, " + ("done" if int(header["seq"]) == int(header["total"]) else "sending next packet"))
                         break
                     else:
@@ -592,7 +592,7 @@ class RDTProtocol_v3(RDTProtocol_v2_0):
             else:
                 header, data = self._extract(receipt)
 
-                if self._is_header_valid(header, recvSeqNum):
+                if self._is_packet_valid(header, data, recvSeqNum, False):
 
                     # checking FINMSG
                     if data == "FINMSG":
@@ -622,7 +622,7 @@ class RDTProtocol_v3(RDTProtocol_v2_0):
                         # can corrupt here
                         socket.send(reply)
                 else:
-                    print("Received garbled packet or timed out, sending dupe ACK")
+                    print("Received invalid packet or timed out, sending dupe ACK")
                     need_to_rerequest = True
                     
                     
@@ -630,16 +630,19 @@ class RDTProtocol_v3(RDTProtocol_v2_0):
                 if need_to_rerequest:
                     header["flags"] = self.FLAGS["ACK"]
                     # pick the opposite number to load in, for dupe ack!
-                    header["pkt_num"] = 1 if expected_pkt_num == 0 else 0
+                    header["pkt_num"] = 1 if recvSeqNum == 0 else 0
                     socket.send(self._create_header(header))
 
 
-    def _is_header_valid(self, header: dict[str, str], expected_pkt_num: int) -> bool:
+    def _is_packet_valid(self, header: dict[str, str], data: str, expected_pkt_num: int, ack_expected: bool) -> bool:
         """Determine if a header represents a valid packet"""
         checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
-        return (header["flags"] & self.FLAGS["ACK"]) \
-                and checksum_valid \
-                and expected_pkt_num == header["pkt_num"]
+        if checksum_valid and expected_pkt_num == int(header["pkt_num"]):
+            if ack_expected: 
+                return header["flags"] & self.FLAGS["ACK"]
+            else:
+                return not header["flags"] & self.FLAGS["ACK"]
+        return False
 
     def _receive_data_or_timeout(self, socket: GenericSocket) -> tuple[bool, Union[None, str]]:
         """
