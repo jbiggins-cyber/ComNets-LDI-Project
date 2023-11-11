@@ -94,3 +94,16 @@ Configure the topology:
 - Open a console for each image
 - Enter `python simple_client.py 1.0 --ip 192.168.0.2`, adjusting as required
 - Enjoy communications!
+
+### Updating images in GNS3
+
+GNS3 doesn't make it convenient to update images. To do so, follow this procedure:
+
+- Delete the devices from your network topology.
+- Delete the devices from your *End Devices* panel (or *edit* > *preferences* > *docker containers*).
+- Stop GNS3.
+- In a LUbtuntu terminal, run `docker ps -a`, and note the container ID for the client and server images.
+- Run `docker rm <container id>`.
+- Run `docker rmi adleris/rdt-client # or server`.
+- Open GNS3, and import the images back in as per the above section.
+
