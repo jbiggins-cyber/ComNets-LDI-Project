@@ -1,6 +1,7 @@
 import select
 import time
 from math import ceil
+from typing import Union
 
 from transport import *
 import rdt_functionality
@@ -533,14 +534,15 @@ class RDTProtocol_v2_2(RDTProtocol_v2_1):
             corruptReply = rdt_functionality.corruptPkt(reply, self.error_num, self.error_prob, self.burst)
             socket.send(corruptReply)
 
-class RDTProtocol_v3(RDTProtocolStrategy):
+class RDTProtocol_v3(RDTProtocol_v2_0):
     def send_fsm(self, socket: GenericSocket, data: str):
         packets_to_send: list[str] = self._split_data_into_packets(data)
         print("MSG: SEND: will send: \033[33m", packets_to_send, '\033[0m')
 
         for packet in packets_to_send:
             # poor way of getting the header value, but it'll do
-            expected_ack_num =int(self._extract(packet)[0]["pkt_num"])
+            print('\033[35m', packet, '\033[0m')
+            expected_ack_num: int  = int(self._extract(packet)[0]["pkt_num"])
             
             # Don't wait for an ACK on a FINMSG, as we have the two generals problem
             if data == "FINMSG":
@@ -557,6 +559,7 @@ class RDTProtocol_v3(RDTProtocolStrategy):
                 if timed_out:
                     print("Timed out waiting for ACK, re-sending packet")
                     need_to_rerequest = True
+                    # TODO: do we need to generate a new header?
                 else:
                     header, data = self._extract(receipt)
 
@@ -573,12 +576,70 @@ class RDTProtocol_v3(RDTProtocolStrategy):
                     continue
         return
 
-    def _is_header_valid(self, header: dict[str, str], expected_ack_num: int) -> bool:
+    def recv_fsm(self, socket: GenericSocket) -> list[tuple[str, str]]:
+        received_data_buffer = []
+        have_received_data: bool = False
+        expected_packets: int = 0
+
+        recvSeqNum: int = 0      # receiver sequence number
+        while True:
+            need_to_rerequest: bool = False
+            is_timed_out, receipt = self._receive_data_or_timeout(socket)
+
+            if is_timed_out:
+                need_to_rerequest = True
+                # TODO: do we need to generate a new header?
+            else:
+                header, data = self._extract(receipt)
+
+                if self._is_header_valid(header, recvSeqNum):
+
+                    # checking FINMSG
+                    if data == "FINMSG":
+                        return [(header, data)]
+
+                    # saving expected number of packets
+                    if not have_received_data:
+                        expected_packets = int(header["total"])
+                        have_received_data = True
+
+
+                    received_data_buffer.append((header, data))
+
+                    # fill our reply with the correct ACK num for this packet
+                    header["flags"] = self.FLAGS["ACK"]
+                    header["pkt_num"] = recvSeqNum
+                    # update number for the next packet that we're expecting
+                    recvSeqNum = 1 if recvSeqNum == 0 else 0
+                    reply = self._create_header(header)
+
+
+                    print("Received valid packet, sending ACK")
+                    if len(received_data_buffer) == expected_packets:
+                        socket.send(reply)
+                        return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
+                    else:
+                        # can corrupt here
+                        socket.send(reply)
+                else:
+                    print("Received garbled packet or timed out, sending dupe ACK")
+                    need_to_rerequest = True
+                    
+                    
+                # send a dupe ack for timeout or garbled!
+                if need_to_rerequest:
+                    header["flags"] = self.FLAGS["ACK"]
+                    # pick the opposite number to load in, for dupe ack!
+                    header["pkt_num"] = 1 if expected_pkt_num == 0 else 0
+                    socket.send(self._create_header(header))
+
+
+    def _is_header_valid(self, header: dict[str, str], expected_pkt_num: int) -> bool:
         """Determine if a header represents a valid packet"""
         checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
         return (header["flags"] & self.FLAGS["ACK"]) \
                 and checksum_valid \
-                and expected_ack_num == header["pkt_num"]
+                and expected_pkt_num == header["pkt_num"]
 
     def _receive_data_or_timeout(self, socket: GenericSocket) -> tuple[bool, Union[None, str]]:
         """
@@ -596,5 +657,3 @@ class RDTProtocol_v3(RDTProtocolStrategy):
         else:
             return False, socket.receive()
 
-    def recv_fsm(self, socket: GenericSocket) -> list[tuple[str, str]]:
-        pass
