@@ -534,4 +534,51 @@ class RDTProtocol_v2_2(RDTProtocol_v2_1):
             socket.send(corruptReply)
 
 class RDTProtocol_v3(RDTProtocolStrategy):
-    pass
+    def send_fsm(self, socket: GenericSocket, data: str):
+        packets_to_send: list[str] = self._split_data_into_packets(data)
+        print("MSG: SEND: will send: \033[33m", packets_to_send, '\033[0m')
+
+        for packet in packets_to_send:
+            # poor way of getting the header value, but it'll do
+            expected_ack_num =int(self._extract(packet)[0]["pkt_num"])
+            
+            # Don't wait for an ACK on a FINMSG, as we have the two generals problem
+            if data == "FINMSG":
+                socket.send(packet)
+                return
+
+            # wait for ACK
+            while True:
+                need_to_rerequest: bool = False 
+                readable, _, _ = select.select([socket.sock], [], [], self.RECV_TIMEOUT)
+
+                # check for timeout
+                if not readable:
+                    print("Timed out waiting for ACK, re-sending packet")
+                    need_to_rerequest = True
+                else:
+                    receipt: str = socket.receive()
+                    header, data = self._extract(receipt)
+                    checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
+
+                    # if this condition hits, we have successful ACK
+                    if self._is_header_valid(header, expected_ack_num):
+                        print("Received an ACK, " + ("done" if int(header["seq"]) == int(header["total"]) else "sending next packet"))
+                        break
+                    else:
+                        print("Received duplicate/garbled ACK, re-sending packet")
+                        need_to_rerequest = True
+                    
+                    if need_to_rerequest:
+                        socket.send(packet)
+                        continue
+        return
+
+    def _is_header_valid(self, header: dict[str, str], expected_ack_num: int) -> bool:
+        """Determine if a header represents a valid packet"""
+        return (header["flags"] & self.FLAGS["ACK"]) \
+                and checksum_valid \
+                and expected_ack_num == header["pkt_num"]
+
+    def recv_fsm(self, socket: GenericSocket) -> list[tuple[str, str]]:
+        pass
