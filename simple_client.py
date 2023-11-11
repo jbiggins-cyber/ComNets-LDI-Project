@@ -37,23 +37,15 @@ try:
     while True:
         data = input()
 
-        if args.rdt_ver=='2.1':
-            if data == 'close':
-                m.finish()
-            else:
-                print("Sending...")
-                m.send(data)
-            
+        if data == 'close':
+            m.finish()
         else:
-            if data == 'close':
-                m.finish()
-            else:
-                print("Sending...")
-                m.send(data)
-                print("Waiting to receive...")
-                r = m.receive()
+            print("Sending...")
+            m.send(data)
+            print("Waiting to receive...")
+            r = m.receive()
 
-                print("CLIENT: received [[" + r + "]]")
+            print("CLIENT: received [[" + r + "]]")
 
     # todo handle timeout
     m.finish()

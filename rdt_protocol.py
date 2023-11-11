@@ -357,7 +357,7 @@ class RDTProtocol_v2_1(RDTProtocol_v2_0):
 
             # wait for ACK or NAK
             while True:
-                receipt: str = socket.receive()
+                receipt = socket.receive()
                 header, data = self._extract(receipt)
 
                 # if this condition hits, we have successful ACK
@@ -366,18 +366,16 @@ class RDTProtocol_v2_1(RDTProtocol_v2_0):
                     break
 
                 # if this condition hits, we have successful NAK => need to re-request
-                elif data == "NACK":
+                elif data == "NAK":
                     print("Received a NAK, re-sending packet")
                     corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
                     socket.send(corruptPkt)
-                    continue
 
                 # if this condition hits, we have garbled ACK/NAK => need to re-request
                 else:
                     print("ACK/NAK was garbled, re-sending packet")
                     corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
                     socket.send(corruptPkt)
-                    continue
         return
     
     def recv_fsm(self, socket: GenericSocket) -> list[tuple[str, str]]:
@@ -392,33 +390,40 @@ class RDTProtocol_v2_1(RDTProtocol_v2_0):
             # checking FINMSG
             if data == "FINMSG":
                 return [(header, data)]
+            
+            # saving expected number of packets
+            if not have_received_data:
+                expected_packets = int(header["total"])
+                have_received_data = True
 
             # checking corrupt
             checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
             # send NAK if corrupt
             if not checksum_valid:
-                [packet] = self._split_data_into_packets("NAK")
+                print("Message corrupt, sending NAK")
+                reply = (self._split_data_into_packets("NAK"))[0]
 
             # checking sequence number
-            elif header["pkt_num"] == recvSeqNum:
+            elif int(header["pkt_num"]) == recvSeqNum:
                 # send ACK if correct sequence number, then update sequence number
+                print("Sequence number correct, sending ACK and updating sequence number")
                 received_data_buffer.append((header, data))
-                [packet] = self._split_data_into_packets("ACK")
+                reply = (self._split_data_into_packets("ACK"))[0]
                 recvSeqNum = recvSeqNum ^ 1
+
+                # must send uncorrupted ACK on last message received; Two Generals Problem
+                if len(received_data_buffer) == expected_packets:
+                    socket.send(reply)
+                    return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
 
             # wrong sequence number, need to re-send ACK
             else:
-                [packet] = self._split_data_into_packets("ACK")
+                print("Sequence number incorrect, re-sending ACK")
+                reply = (self._split_data_into_packets("ACK"))[0]
             
             # sending ACK or NAK
-            corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
-            socket.send(corruptPkt)
-
-            if not have_received_data:
-                expected_packets = int(header["total"])
-                have_received_data = True
-            if len(received_data_buffer) == expected_packets:
-                return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
+            corruptReply = rdt_functionality.corruptPkt(reply, self.error_num, self.error_prob, self.burst)
+            socket.send(corruptReply)
 
 class RDTProtocol_v2_2(RDTProtocolStrategy):
     pass
