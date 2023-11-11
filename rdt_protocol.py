@@ -425,8 +425,113 @@ class RDTProtocol_v2_1(RDTProtocol_v2_0):
             corruptReply = rdt_functionality.corruptPkt(reply, self.error_num, self.error_prob, self.burst)
             socket.send(corruptReply)
 
-class RDTProtocol_v2_2(RDTProtocolStrategy):
-    pass
+class RDTProtocol_v2_2(RDTProtocol_v2_1):
+
+    def _split_data_into_packets(self, data: str, flags: int = 0x00, pkt_num_start=0) -> list[str]:
+        """
+        Split up a message by size
+        This does the make_pkt() functionality
+        """
+        packet_list = []
+        n_packets = ceil(len(data) / self.PACKET_DATA_LEN)
+
+        for i in range(n_packets):
+            data_idx = i*self.PACKET_DATA_LEN
+            next_data = data[data_idx:min(data_idx+self.PACKET_DATA_LEN, len(data))]
+
+            # seq = i+1 means that seq of last packet == total
+            checksum = ''.join(rdt_functionality.generateUDPChecksum(next_data.encode('utf-8')))
+            pkt_num = (i+pkt_num_start) % 2
+            header_params = {"seq": i+1, "total": n_packets, "flags": flags, "check": checksum, "pkt_num": pkt_num}
+            header = self._create_header(header_params)
+            next_packet = header + '\n' + next_data
+            packet_list.append(next_packet)
+
+        return packet_list
+    
+    def send_fsm(self, socket: GenericSocket, data: str):
+        packets_to_send: list[str] = self._split_data_into_packets(data)
+        print("MSG: SEND: will send: \033[33m", packets_to_send, '\033[0m')
+
+        i = 0
+        for packet in packets_to_send:
+
+            if data == "FINMSG":
+                socket.send(packet)
+                return
+            
+            # call to send pkt 0
+            else:
+                corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
+                socket.send(corruptPkt)
+
+                # getting current sequence number
+                sndrSeqNum = i % 2
+
+            # wait for ACK for correct pkt number
+            while True:
+                receipt = socket.receive()
+                header, data = self._extract(receipt)
+
+                # checking pkt number and successful ACK
+                if (int(header["pkt_num"]) == sndrSeqNum) and (data == "ACK"):
+                    print("Received an ACK, " + ("done" if int(header["seq"]) == int(header["total"]) else "sending next packet"))
+                    i += 1
+                    break
+            
+                # ACK is corrupted or for wrong sequence number => re-send
+                else:
+                    print("ACK garbled or for wrong packet, re-sending packet")
+                    corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
+                    socket.send(corruptPkt)
+                    continue
+        return
+    
+    def recv_fsm(self, socket: GenericSocket) -> list[tuple[str, str]]:
+        received_data_buffer = []
+        have_received_data = False
+
+        recvSeqNum = 0      # receiver sequence number
+        while True:
+            receipt = socket.receive()
+            header, data = self._extract(receipt)
+
+            # checking FINMSG
+            if data == "FINMSG":
+                return [(header, data)]
+
+            # saving expected number of packets
+            if not have_received_data:
+                expected_packets = int(header["total"])
+                have_received_data = True
+
+            # checking corrupt
+            checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
+            # re-send ACK for previous packet if corrupt
+            if not checksum_valid:
+                print("Message corrupt, re-sending previous ACK")
+                reply = (self._split_data_into_packets("ACK", pkt_num_start=(recvSeqNum^1)))[0]
+
+            elif int(header["pkt_num"]) == recvSeqNum:
+                # send ACK if correct sequence number, then update sequence number
+                print("Sequence number correct, sending ACK and updating sequence number")
+                received_data_buffer.append((header, data))
+                reply = (self._split_data_into_packets("ACK", pkt_num_start=recvSeqNum))[0]
+                recvSeqNum = recvSeqNum ^ 1
+
+                # must send uncorrupted ACK on last message received; Two Generals Problem
+                if len(received_data_buffer) == expected_packets:
+                    socket.send(reply)
+                    return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
+                
+            # wrong sequence number, need to re-send ACK
+            else:
+                print("Sequence number incorrect, re-sending ACK")
+                reply = (self._split_data_into_packets("ACK", pkt_num_start=(recvSeqNum^1)))[0]
+
+            # sending ACK
+            corruptReply = rdt_functionality.corruptPkt(reply, self.error_num, self.error_prob, self.burst)
+            socket.send(corruptReply)
 
 class RDTProtocol_v3(RDTProtocolStrategy):
     pass
