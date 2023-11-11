@@ -559,7 +559,6 @@ class RDTProtocol_v3(RDTProtocolStrategy):
                     need_to_rerequest = True
                 else:
                     header, data = self._extract(receipt)
-                    checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
 
                     # if this condition hits, we have successful ACK
                     if self._is_header_valid(header, expected_ack_num):
@@ -569,13 +568,14 @@ class RDTProtocol_v3(RDTProtocolStrategy):
                         print("Received duplicate/garbled ACK, re-sending packet")
                         need_to_rerequest = True
                     
-                    if need_to_rerequest:
-                        socket.send(packet)
-                        continue
+                if need_to_rerequest:
+                    socket.send(packet)
+                    continue
         return
 
     def _is_header_valid(self, header: dict[str, str], expected_ack_num: int) -> bool:
         """Determine if a header represents a valid packet"""
+        checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
         return (header["flags"] & self.FLAGS["ACK"]) \
                 and checksum_valid \
                 and expected_ack_num == header["pkt_num"]
