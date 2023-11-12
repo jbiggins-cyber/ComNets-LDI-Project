@@ -541,7 +541,6 @@ class RDTProtocol_v3(RDTProtocol_v2_2):
 
         for packet in packets_to_send:
             # poor way of getting the header value, but it'll do
-            print('\033[35m', packet, '\033[0m')
             expected_ack_num: int  = int(self._extract(packet)[0]["pkt_num"])
             
             # Don't wait for an ACK on a FINMSG, as we have the two generals problem

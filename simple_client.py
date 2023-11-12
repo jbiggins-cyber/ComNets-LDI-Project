@@ -31,21 +31,21 @@ try:
     m = messenger.ClientMessenger(sock_type=args.sock_type, ip=args.ip, rdt=RDTFactory.create(args.rdt_ver, 
                                                                                                     args.error_prob, args.error_num, args.burst))
 
-    print("Successfully started " + m.sock_type + " client")
+    print("\033[35mSuccessfully started " + m.sock_type + " client\033[0m")
 
     # exchange messages on this connection
     while True:
-        data = input()
+        data = input("\033[35mprompt>\033[0m")
 
         if data == 'close':
             m.finish()
         else:
-            print("Sending...")
+            print("\033[35mSending...\033[0m")
             m.send(data)
-            print("Waiting to receive...")
+            print("\033[35mWaiting to receive...\033[0m")
             r = m.receive()
 
-            print("CLIENT: received [[" + r + "]]")
+            print("\033[35mReceived [[" + r + "]]\033[0m")
 
     # todo handle timeout
     m.finish()
