@@ -588,8 +588,13 @@ class RDTProtocol_v3(RDTProtocol_v2_2):
             is_timed_out, receipt = self._receive_data_or_timeout(socket)
 
             if is_timed_out:
-                need_to_rerequest = True
-                # TODO: do we need to generate a new header?
+                # We can enter this condition before the sender ever sends anything,
+                # for example when the server is waiting for the client to decide 
+                # to send something. If we haven't received anything then we should
+                # just keep waiting
+                if have_received_data:
+                    need_to_rerequest = True
+
             else:
                 header, data = self._extract(receipt)
 
@@ -627,12 +632,12 @@ class RDTProtocol_v3(RDTProtocol_v2_2):
                     need_to_rerequest = True
                     
                     
-                # send a dupe ack for timeout or garbled!
-                if need_to_rerequest:
-                    header["flags"] = self.FLAGS["ACK"]
-                    # pick the opposite number to load in, for dupe ack!
-                    header["pkt_num"] = 1 if recvSeqNum == 0 else 0
-                    socket.send(self._create_header(header))
+            # send a dupe ack for timeout or garbled!
+            if need_to_rerequest:
+                header["flags"] = self.FLAGS["ACK"]
+                # pick the opposite number to load in, for dupe ack!
+                header["pkt_num"] = 1 if recvSeqNum == 0 else 0
+                socket.send(self._create_header(header))
 
 
     def _is_packet_valid(self, header: dict[str, str], data: str, expected_pkt_num: int, ack_expected: bool) -> bool:
