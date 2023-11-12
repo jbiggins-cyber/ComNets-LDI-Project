@@ -609,15 +609,13 @@ class RDTProtocol_v3(RDTProtocol_v2_2):
                         expected_packets = int(header["total"])
                         have_received_data = True
 
-
                     received_data_buffer.append((header, data))
 
                     # fill our reply with the correct ACK num for this packet
-                    header["flags"] = self.FLAGS["ACK"]
                     header["pkt_num"] = recvSeqNum
+                    reply = self._create_ack_packet(header)
                     # update number for the next packet that we're expecting
                     recvSeqNum = 1 if recvSeqNum == 0 else 0
-                    reply = self._create_header(header)
 
 
                     print("Received valid packet, sending ACK")
@@ -667,3 +665,13 @@ class RDTProtocol_v3(RDTProtocol_v2_2):
         else:
             return False, socket.receive()
 
+    def _create_ack_packet(self, header: dict[str, str]) -> str:
+        """This function creates an ACK packet matching the rest of the parameters of the provided header"""
+        ## generate the fields required from args, including the checksum on a blank packet!
+        ## off to bed
+        checksum = ''.join(rdt_functionality.generateUDPChecksum(''))
+        header['check'] = checksum
+        header["flags"] = self.FLAGS["ACK"]
+        ack_packet = self._create_header(header)
+
+        return ack_packet
