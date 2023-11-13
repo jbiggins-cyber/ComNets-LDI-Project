@@ -20,6 +20,9 @@ From the client side, you can then type messages to send to the server. Note: st
 -h, --help              show this help message and exit
 --sock_type {udp,tcp}   Socket type (choose from: udp, tcp, default: udp)
 --ip IP                 IP address (default: localhost)
+--error_prob int        Error Probability (default: 0)
+--error_num int         Number of bit errors in corrupt messages (default: 1)
+--burst int             Length of burst errors in corrupt messages (default: 0) [using this setting overwrites --error_num)
 ```
 
 ### Structure
