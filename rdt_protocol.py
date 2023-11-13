@@ -6,6 +6,7 @@ from typing import Union
 from transport import *
 import rdt_functionality
 from transport import GenericSocket
+from random import randint
 
 REJECT_FIRST_TIME_FLAG = False
 
@@ -539,114 +540,94 @@ class RDTProtocol_v3(RDTProtocol_v2_2):
         packets_to_send: list[str] = self._split_data_into_packets(data)
         print("MSG: SEND: will send: \033[33m", packets_to_send, '\033[0m')
 
+        i = 0
         for packet in packets_to_send:
-            # poor way of getting the header value, but it'll do
-            expected_ack_num: int  = int(self._extract(packet)[0]["pkt_num"])
             
             # Don't wait for an ACK on a FINMSG, as we have the two generals problem
             if data == "FINMSG":
                 socket.send(packet)
                 return
 
+            # call to send pkt 0
+            else:
+                corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
+                socket.send(corruptPkt)
+
+                # getting current sequence number
+                sndrSeqNum = i % 2
+
             # wait for ACK
             while True:
-                need_to_rerequest: bool = False 
-                
-                # blocking receive on the socket
                 (timed_out, receipt) = self._receive_data_or_timeout(socket)
 
                 if timed_out:
                     print("Timed out waiting for ACK, re-sending packet")
                     need_to_rerequest = True
-                    # TODO: do we need to generate a new header?
                 else:
                     header, data = self._extract(receipt)
 
-                    # if this condition hits, we have successful ACK
-                    if self._is_packet_valid(header, data, expected_ack_num, True):
+                    # checking pkt number and successful ACK
+                    if (int(header["pkt_num"]) == sndrSeqNum) and (data == "ACK"):
                         print("Received an ACK, " + ("done" if int(header["seq"]) == int(header["total"]) else "sending next packet"))
+                        i += 1
                         break
+                
+                    # ACK is corrupted or for wrong sequence number => re-send
                     else:
-                        print("Received duplicate/garbled ACK, re-sending packet")
-                        print(f"\texpected number: {expected_ack_num}, got {header['pkt_num']}")
-                        need_to_rerequest = True
-                    
-                if need_to_rerequest:
-                    socket.send(packet)
-                    continue
+                        print("ACK garbled or for wrong packet, re-sending packet")
+                        corruptPkt = rdt_functionality.corruptPkt(packet, self.error_num, self.error_prob, self.burst)
+                        socket.send(corruptPkt)
+                        continue
         return
 
     def recv_fsm(self, socket: GenericSocket) -> list[tuple[str, str]]:
         received_data_buffer = []
-        have_received_data: bool = False
-        expected_packets: int = 0
+        have_received_data = False
 
-        recvSeqNum: int = 0      # receiver sequence number
+        recvSeqNum = 0      # receiver sequence number
         while True:
-            need_to_rerequest: bool = False
-            is_timed_out, receipt = self._receive_data_or_timeout(socket)
+            receipt = socket.receive()
+            header, data = self._extract(receipt)
 
-            if is_timed_out:
-                # We can enter this condition before the sender ever sends anything,
-                # for example when the server is waiting for the client to decide 
-                # to send something. If we haven't received anything then we should
-                # just keep waiting
-                if have_received_data:
-                    need_to_rerequest = True
+            # checking FINMSG
+            if data == "FINMSG":
+                return [(header, data)]
 
+            # saving expected number of packets
+            if not have_received_data:
+                expected_packets = int(header["total"])
+                have_received_data = True
+
+            # checking corrupt
+            checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
+            # re-send ACK for previous packet if corrupt
+            if not checksum_valid:
+                time.sleep(randint(1,3))    # simulates random delay (not jitter because messages will not arrive out of order)
+                print("Message corrupt, re-sending previous ACK")
+                reply = (self._split_data_into_packets("ACK", pkt_num_start=(recvSeqNum^1)))[0]
+
+            elif int(header["pkt_num"]) == recvSeqNum:
+                # send ACK if correct sequence number, then update sequence number
+                time.sleep(randint(1,3))    # simulates random delay (not jitter because messages will not arrive out of order)
+                print("Sequence number correct, sending ACK and updating sequence number")
+                received_data_buffer.append((header, data))
+                reply = (self._split_data_into_packets("ACK", pkt_num_start=recvSeqNum))[0]
+                recvSeqNum = recvSeqNum ^ 1
+
+                # must send uncorrupted ACK on last message received; Two Generals Problem
+                if len(received_data_buffer) == expected_packets:
+                    socket.send(reply)
+                    return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
+                
+            # wrong sequence number, need to re-send ACK
             else:
-                header, data = self._extract(receipt)
+                time.sleep(randint(1,3))    # simulates random delay (not jitter because messages will not arrive out of order)
+                print("Sequence number incorrect, re-sending ACK")
+                reply = (self._split_data_into_packets("ACK", pkt_num_start=(recvSeqNum^1)))[0]
 
-                if self._is_packet_valid(header, data, recvSeqNum, False):
-
-                    # checking FINMSG
-                    if data == "FINMSG":
-                        return [(header, data)]
-
-                    # saving expected number of packets
-                    if not have_received_data:
-                        expected_packets = int(header["total"])
-                        have_received_data = True
-
-                    received_data_buffer.append((header, data))
-
-                    # fill our reply with the correct ACK num for this packet
-                    header["pkt_num"] = recvSeqNum
-                    reply = self._create_ack_packet(header)
-                    # update number for the next packet that we're expecting
-                    recvSeqNum = 1 if recvSeqNum == 0 else 0
-
-
-                    print("Received valid packet, sending ACK")
-                    if len(received_data_buffer) == expected_packets:
-                        socket.send(reply)
-                        return sorted(received_data_buffer, key=lambda r:r[0]["seq"])
-                    else:
-                        # can corrupt here
-                        socket.send(reply)
-                else:
-                    print("Received invalid packet or timed out, sending dupe ACK")
-                    need_to_rerequest = True
-                    
-                    
-            # send a dupe ack for timeout or garbled!
-            if need_to_rerequest:
-                header["flags"] = self.FLAGS["ACK"]
-                # pick the opposite number to load in, for dupe ack!
-                header["pkt_num"] = 1 if recvSeqNum == 0 else 0
-                socket.send(self._create_header(header))
-
-
-    def _is_packet_valid(self, header: dict[str, str], data: str, expected_pkt_num: int, ack_expected: bool) -> bool:
-        """Determine if a header represents a valid packet"""
-        checksum_valid = not rdt_functionality.verifyUDPChecksum(data.encode('utf-8'), list(header["check"]))
-        checksum_valid = True
-        if checksum_valid and expected_pkt_num == int(header["pkt_num"]):
-            if ack_expected: 
-                return header["flags"] & self.FLAGS["ACK"]
-            else:
-                return not header["flags"] & self.FLAGS["ACK"]
-        return False
+            # sending ACK
+            corruptReply = rdt_functionality.corruptPkt(reply, self.error_num, self.error_prob, self.burst)
+            socket.send(corruptReply)
 
     def _receive_data_or_timeout(self, socket: GenericSocket) -> tuple[bool, Union[None, str]]:
         """
@@ -663,14 +644,3 @@ class RDTProtocol_v3(RDTProtocol_v2_2):
             return True, None
         else:
             return False, socket.receive()
-
-    def _create_ack_packet(self, header: dict[str, str]) -> str:
-        """This function creates an ACK packet matching the rest of the parameters of the provided header"""
-        ## generate the fields required from args, including the checksum on a blank packet!
-        ## off to bed
-        checksum = ''.join(rdt_functionality.generateUDPChecksum(''))
-        header['check'] = checksum
-        header["flags"] = self.FLAGS["ACK"]
-        ack_packet = self._create_header(header)
-
-        return ack_packet
