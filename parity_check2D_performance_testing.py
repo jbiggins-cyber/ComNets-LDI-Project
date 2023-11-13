@@ -57,11 +57,11 @@ byteMsg = SAMPLE.encode('utf-8')
 print("""Sample message: "{}" """.format(byteMsg))
 print("# bits in sample message: {}".format(len(str2Bin(SAMPLE))))
 
-# # Print the percentage of errors detected and of errors corrected for different numbers of bit errors
-# numErrors = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 16]
-# for i in numErrors:
-#     percentDetected, percentCorrected = parityCheck2DDetectRate(byteMsg, i)
-#     print("Num Errors: {}, Detected: {}%, Corrected: {}%".format(i, percentDetected, percentCorrected))
+# Print the percentage of errors detected and of errors corrected for different numbers of bit errors
+numErrors = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 16]
+for i in numErrors:
+    percentDetected, percentCorrected = parityCheck2DDetectRate(byteMsg, i)
+    print("Num Errors: {}, Detected: {}%, Corrected: {}%".format(i, percentDetected, percentCorrected))
     
 # Print the percentage of errors detected and corrected for different length burst errors
 burstLen = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
